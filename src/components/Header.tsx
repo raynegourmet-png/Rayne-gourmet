@@ -38,11 +38,11 @@ export default function Header({ onMenuClick, onLoginClick, onAdminClick, cartCo
           {isAdmin && (
             <button 
               onClick={onAdminClick}
-              aria-label="Abrir painel de gestão"
-              className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-[#E63956] font-bold text-xs md:text-sm bg-[#E63956]/5 border border-[#E63956]/10 rounded-full hover:bg-[#E63956]/10 transition-all shadow-sm"
+              aria-label="Abrir painel de controle"
+              className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-white font-bold text-xs md:text-sm bg-[#E63956] rounded-full hover:bg-[#D81B60] transition-all shadow-md shadow-[#E63956]/20"
             >
               <Settings size={16} />
-              <span className="hidden sm:inline">Gestão</span>
+              <span className="hidden sm:inline">Painel de Controle</span>
             </button>
           )}
 

@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, LogIn, Crown, History, Settings, LogOut, Sparkles, Star, Loader2, Clock } from 'lucide-react';
 import { auth, googleProvider, db } from './lib/firebase';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { ref, onValue, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, onValue, query, orderByChild, equalTo, get } from 'firebase/database';
 import { initializeDataIfEmpty, handleDatabaseError, OperationType } from './lib/db';
 
 export default function App() {
@@ -41,6 +41,15 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // Check for admin routes on mount and changes
+    const path = window.location.pathname;
+    if (path === '/admin' || path === '/dashboard') {
+      setIsAdminOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     // Inicialização silenciosa em background
@@ -48,14 +57,54 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const adminEmails = ['raynegourmet@gmail.com', 'dfilho02@gmail.com'];
-    const isAdminUser = user?.email ? adminEmails.includes(user.email) : false;
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      // 1. Email check (from .env or defaults)
+      const adminEmails = [
+        'raynegourmet@gmail.com', 
+        'dfilho02@gmail.com',
+        import.meta.env.VITE_ADMIN_EMAIL
+      ].filter(Boolean);
+      
+      if (user.email && adminEmails.includes(user.email)) {
+        setIsAdmin(true);
+        return;
+      }
+
+      // 2. Check /admins/${uid} node
+      try {
+        const adminRef = ref(db, `admins/${user.uid}`);
+        const adminSnapshot = await get(adminRef);
+        if (adminSnapshot.exists() && adminSnapshot.val() === true) {
+          setIsAdmin(true);
+          return;
+        }
+
+        // 3. Check /users/${uid}/isAdmin node
+        const userAdminRef = ref(db, `users/${user.uid}/isAdmin`);
+        const userAdminSnapshot = await get(userAdminRef);
+        if (userAdminSnapshot.exists() && userAdminSnapshot.val() === true) {
+          setIsAdmin(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking admin status:", err);
+      }
+
+      setIsAdmin(false);
+    };
+
+    checkAdminStatus();
     
-    if (isAdminUser) {
+    if (isAdmin) {
       // Re-run for admins just in case
       initializeDataIfEmpty(INITIAL_PRODUCTS, INITIAL_LOYALTY_TIERS);
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
     // Captura o resultado do redirect assim que o app carrega
@@ -255,9 +304,6 @@ export default function App() {
   const handleLogout = async () => {
     await signOut(auth);
   };
-
-  const adminEmails = ['raynegourmet@gmail.com', 'dfilho02@gmail.com'];
-  const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
   const clearCart = () => setCart([]);
 

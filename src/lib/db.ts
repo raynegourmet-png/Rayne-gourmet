@@ -291,7 +291,8 @@ export const initializeDataIfEmpty = async (initialProducts: Product[], initialT
       await set(configRef, INITIAL_CONFIG);
     }
   } catch (error) {
-    handleDatabaseError(error, OperationType.WRITE, 'initial-seed');
+    console.error('Initialization seed failed (non-fatal):', error);
+    // Don't throw here to avoid blocking UI rendering
   }
 };
 
