@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "raynegourmet@gmail.com" || 
+        request.auth.token.email == "dfilho02@gmail.com"
+      );
+    }
+
+    // Public read for products and loyalty tiers, write for admin only
+    // Anyone can update stock during an order
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);
+    }
+    
+    match /loyaltyTiers/{tierId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Anyone can create an order, users can read their own, admin can read all
+    match /orders/{orderId} {
+      allow create: if true;
+      allow read: if isAdmin() || (request.auth != null && (resource == null || resource.data.userId == request.auth.uid));
+      allow update, delete: if isAdmin();
+    }
+
+    // Coupons and Delivery Areas: Public read, Admin write
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /deliveryAreas/{areaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Feedbacks: Anyone can create, only admin can read all
+    match /feedbacks/{feedbackId} {
+      allow create: if true;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Store Configuration: Public read, Admin write
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Generic rule for any other potential collection that admin might need to access
+    match /{path=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

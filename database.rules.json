@@ -1,0 +1,37 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": "auth != null",
+    "products": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.email === 'raynegourmet@gmail.com' || auth.token.email === 'dfilho02@gmail.com')"
+    },
+    "loyaltyTiers": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.email === 'raynegourmet@gmail.com' || auth.token.email === 'dfilho02@gmail.com')"
+    },
+    "orders": {
+      ".indexOn": ["userId", "timestamp"],
+      ".read": "auth != null",
+      "$order_id": {
+        ".write": "auth != null && (!data.exists() || auth.uid === data.child('userId').val() || auth.token.email === 'raynegourmet@gmail.com' || auth.token.email === 'dfilho02@gmail.com')"
+      }
+    },
+    "config": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.email === 'raynegourmet@gmail.com' || auth.token.email === 'dfilho02@gmail.com')"
+    },
+    "coupons": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.email === 'raynegourmet@gmail.com' || auth.token.email === 'dfilho02@gmail.com')"
+    },
+    "deliveryAreas": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.email === 'raynegourmet@gmail.com' || auth.token.email === 'dfilho02@gmail.com')"
+    },
+    "feedbacks": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}

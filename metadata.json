@@ -1,0 +1,6 @@
+{
+  "name": "Rayne Gourmet",
+  "description": "Dindins Gourmet Feitos com Amor e Ingredientes Selecionados",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,61 @@
+{
+  "collections": {
+    "products": {
+      "documents": {
+        "spec-1": {
+          "name": "Pudim",
+          "description": "O clássico sabor de pudim de leite condensado com calda de caramelo.",
+          "price": 5.0,
+          "category": "Especiais",
+          "image": "/src/assets/images/gourmet_dindin_pudim_amendoim_oreo_1789856646128.jpg",
+          "available": true,
+          "sortOrder": 1
+        },
+        "prem-1": {
+          "name": "Maracujá c/ Chocolate",
+          "description": "Azedinho do maracujá com uma casquinha crocante de chocolate.",
+          "price": 6.0,
+          "category": "Premium",
+          "image": "/src/assets/images/gourmet_dindin_premium_flavors_1789856658729.jpg",
+          "available": true,
+          "sortOrder": 4
+        }
+      }
+    },
+    "loyaltyTiers": {
+      "documents": {
+        "bronze": {
+          "name": "Bronze",
+          "minOrders": 0,
+          "color": "#CD7F32",
+          "benefits": ["Acesso antecipado a novos sabores", "Cartão fidelidade digital"],
+          "sortOrder": 1
+        },
+        "prata": {
+          "name": "Prata",
+          "minOrders": 5,
+          "color": "#C0C0C0",
+          "benefits": ["5% de desconto em pedidos acima de R$ 50", "Brinde surpresa no mês do aniversário"],
+          "sortOrder": 2
+        },
+        "ouro": {
+          "name": "Ouro",
+          "minOrders": 15,
+          "color": "#FFD700",
+          "benefits": ["10% de desconto em todos os pedidos", "Entrega grátis (até 5km)", "Prioridade na fila de produção"],
+          "sortOrder": 3
+        },
+        "diamante": {
+          "name": "Diamante",
+          "minOrders": 30,
+          "color": "#B9F2FF",
+          "benefits": ["15% de desconto em todos os pedidos", "Degustação gratuita de lançamentos", "Canal de atendimento exclusivo"],
+          "sortOrder": 4
+        }
+      }
+    },
+    "orders": {
+      "documents": {}
+    }
+  }
+}
