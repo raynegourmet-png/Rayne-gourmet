@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { ShoppingCart, Crown, Settings, Loader2, LogOut, User as UserIcon, Star } from 'lucide-react';
 import { User } from 'firebase/auth';
+import { LoyaltyTier } from '../types';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -13,6 +14,7 @@ interface HeaderProps {
   isLoggingIn?: boolean;
   user: User | null;
   points: number;
+  loyaltyTiers: LoyaltyTier[];
 }
 
 export default function Header({ 
@@ -25,8 +27,15 @@ export default function Header({
   isStoreOpen, 
   isLoggingIn,
   user,
-  points
+  points,
+  loyaltyTiers
 }: HeaderProps) {
+  const currentTier = [...loyaltyTiers].reverse().find(t => points >= t.minOrders) || loyaltyTiers[0];
+  const nextTier = loyaltyTiers.find(t => t.minOrders > points);
+  const progress = nextTier 
+    ? ((points - (currentTier?.minOrders || 0)) / (nextTier.minOrders - (currentTier?.minOrders || 0))) * 100 
+    : 100;
+
   return (
     <header className="relative w-full bg-[#FFFDE7] overflow-hidden">
       <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
@@ -63,41 +72,57 @@ export default function Header({
 
           <div className="flex items-center gap-2">
             {user ? (
-              <div className="flex items-center gap-2 md:gap-3 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-[#3E2723]/5 shadow-sm">
-                <div className="hidden sm:flex flex-col items-end mr-1">
-                  <span className="text-[10px] font-black text-[#3E2723] leading-none uppercase truncate max-w-[80px]">
-                    {user.displayName?.split(' ')[0]}
-                  </span>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <Star size={10} className="text-amber-500 fill-amber-500" />
-                    <span className="text-[10px] font-bold text-amber-600 leading-none">{points} pedidos</span>
-                  </div>
-                </div>
-                
+              <div className="flex items-center gap-2 md:gap-3 bg-white px-2 py-1 md:px-3 md:py-2 rounded-2xl border border-[#3E2723]/5 shadow-sm">
                 <button 
                   onClick={onLoginClick}
-                  className="relative group"
-                  title="Minha Conta / Fidelidade"
+                  className="flex items-center gap-2 md:gap-3 text-left"
                 >
-                  {user.photoURL ? (
-                    <img 
-                      src={user.photoURL} 
-                      alt={user.displayName || ''} 
-                      className="w-8 h-8 rounded-full border-2 border-[#E63956]/20 group-hover:border-[#E63956] transition-colors" 
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#E63956]/10 flex items-center justify-center text-[#E63956]">
-                      <UserIcon size={16} />
+                  <div className="relative">
+                    {user.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt={user.displayName || ''} 
+                        className="w-10 h-10 rounded-xl border-2 border-[#E63956]/10" 
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-[#E63956]/10 flex items-center justify-center text-[#E63956]">
+                        <UserIcon size={20} />
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm border border-[#3E2723]/5">
+                      <Star size={10} className="text-amber-500 fill-amber-500" />
                     </div>
-                  )}
+                  </div>
+                  
+                  <div className="flex flex-col pr-2">
+                    <span className="text-[11px] font-black text-[#3E2723] leading-none uppercase truncate max-w-[100px]">
+                      {user.displayName || 'Cliente'}
+                    </span>
+                    
+                    <div className="mt-1.5 w-24 h-1.5 bg-[#F9F9F6] rounded-full overflow-hidden border border-[#3E2723]/5">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: currentTier?.color }}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-[8px] font-black uppercase opacity-40 tracking-tighter" style={{ color: currentTier?.color }}>{currentTier?.name}</span>
+                      <span className="text-[8px] font-black text-[#E63956]">{points} un</span>
+                    </div>
+                  </div>
                 </button>
+
+                <div className="w-px h-8 bg-[#3E2723]/5 mx-1" />
 
                 <button 
                   onClick={onLogoutClick} 
-                  className="text-[#3E2723]/30 hover:text-[#E63956] transition-colors p-1"
+                  className="text-[#3E2723]/20 hover:text-[#E63956] transition-colors p-2"
                   title="Sair"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={18} />
                 </button>
               </div>
             ) : (

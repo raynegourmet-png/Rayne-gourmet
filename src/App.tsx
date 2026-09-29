@@ -344,6 +344,7 @@ export default function App() {
         isLoggingIn={isLoggingIn}
         user={user}
         points={userOrders.length}
+        loyaltyTiers={loyaltyTiers}
       />
 
       <main className="max-w-7xl mx-auto px-6 py-12 md:py-20">

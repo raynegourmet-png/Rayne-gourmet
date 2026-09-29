@@ -152,7 +152,6 @@ ${appliedCoupon ? `*Cupom (${appliedCoupon.code}):* -R$ ${discount.toFixed(2).re
 
       await saveOrder(orderData);
       
-      // Proceed to WhatsApp only after successful save or clear user intent
       const encodedMessage = encodeURIComponent(message);
       window.open(`https://wa.me/5597984493292?text=${encodedMessage}`, '_blank');
       
@@ -160,9 +159,8 @@ ${appliedCoupon ? `*Cupom (${appliedCoupon.code}):* -R$ ${discount.toFixed(2).re
       onClose();
     } catch (err) {
       console.error("Erro ao processar pedido:", err);
-      alert('Houve um problema ao salvar seu pedido no sistema, mas você ainda pode finalizar pelo WhatsApp.');
       
-      // Still allow WhatsApp checkout as a fallback
+      // Still allow WhatsApp checkout even if DB save fails
       const encodedMessage = encodeURIComponent(message);
       window.open(`https://wa.me/5597984493292?text=${encodedMessage}`, '_blank');
       
