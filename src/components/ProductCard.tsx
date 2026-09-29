@@ -1,5 +1,6 @@
-import { motion } from 'motion/react';
-import { Plus, Minus, Info } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Plus, Minus, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product } from '../types';
 
 interface ProductCardProps {
@@ -10,7 +11,22 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, quantity, onAdd, onRemove }: ProductCardProps) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const isAvailable = product.available && (product.stock ?? 0) > 0;
+  
+  const allImages = product.images && product.images.length > 0 
+    ? product.images 
+    : [product.image];
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
 
   return (
     <motion.div
@@ -18,18 +34,51 @@ export default function ProductCard({ product, quantity, onAdd, onRemove }: Prod
       initial={{ opacity: 0, scale: 0.9 }}
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true }}
-      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col h-full"
+      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col h-full group"
     >
-      <div className="relative aspect-square overflow-hidden">
-        <img
-          src={product.image}
-          alt={product.name}
-          loading="lazy"
-          className={`w-full h-full object-cover transition-transform duration-500 hover:scale-110 ${!isAvailable ? 'grayscale opacity-50' : ''}`}
-          referrerPolicy="no-referrer"
-        />
+      <div className="relative aspect-square overflow-hidden bg-slate-100">
+        <AnimatePresence mode="wait">
+          <motion.img
+            key={currentImageIndex}
+            src={allImages[currentImageIndex]}
+            alt={product.name}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            loading="lazy"
+            className={`w-full h-full object-cover ${!isAvailable ? 'grayscale opacity-50' : ''}`}
+            referrerPolicy="no-referrer"
+          />
+        </AnimatePresence>
+
+        {allImages.length > 1 && (
+          <>
+            <button
+              onClick={prevImage}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-[#3E2723] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={nextImage}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-[#3E2723] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+            >
+              <ChevronRight size={20} />
+            </button>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+              {allImages.map((_, i) => (
+                <div 
+                  key={i}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentImageIndex ? 'bg-[#E63956] w-4' : 'bg-white/60'}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
         {!isAvailable && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
             <span className="bg-white text-[#3E2723] px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
               Esgotado
             </span>

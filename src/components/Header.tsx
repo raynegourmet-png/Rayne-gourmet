@@ -1,17 +1,32 @@
 import { motion } from 'motion/react';
-import { ShoppingCart, Crown, Settings, Loader2 } from 'lucide-react';
+import { ShoppingCart, Crown, Settings, Loader2, LogOut, User as UserIcon, Star } from 'lucide-react';
+import { User } from 'firebase/auth';
 
 interface HeaderProps {
   onMenuClick: () => void;
   onLoginClick: () => void;
   onAdminClick: () => void;
+  onLogoutClick: () => void;
   cartCount: number;
   isAdmin: boolean;
   isStoreOpen: boolean;
   isLoggingIn?: boolean;
+  user: User | null;
+  points: number;
 }
 
-export default function Header({ onMenuClick, onLoginClick, onAdminClick, cartCount, isAdmin, isStoreOpen, isLoggingIn }: HeaderProps) {
+export default function Header({ 
+  onMenuClick, 
+  onLoginClick, 
+  onAdminClick, 
+  onLogoutClick,
+  cartCount, 
+  isAdmin, 
+  isStoreOpen, 
+  isLoggingIn,
+  user,
+  points
+}: HeaderProps) {
   return (
     <header className="relative w-full bg-[#FFFDE7] overflow-hidden">
       <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
@@ -46,19 +61,61 @@ export default function Header({ onMenuClick, onLoginClick, onAdminClick, cartCo
             </button>
           )}
 
-          <button 
-            onClick={onLoginClick}
-            disabled={isLoggingIn}
-            aria-label="Abrir Club Rayne"
-            className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-[#3E2723] font-bold text-xs md:text-sm bg-white border border-[#3E2723]/5 rounded-full hover:bg-[#F9F9F6] transition-all shadow-sm disabled:opacity-50"
-          >
-            {isLoggingIn ? (
-              <Loader2 size={16} className="text-[#E63956] animate-spin" />
+          <div className="flex items-center gap-2">
+            {user ? (
+              <div className="flex items-center gap-2 md:gap-3 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-[#3E2723]/5 shadow-sm">
+                <div className="hidden sm:flex flex-col items-end mr-1">
+                  <span className="text-[10px] font-black text-[#3E2723] leading-none uppercase truncate max-w-[80px]">
+                    {user.displayName?.split(' ')[0]}
+                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Star size={10} className="text-amber-500 fill-amber-500" />
+                    <span className="text-[10px] font-bold text-amber-600 leading-none">{points} pedidos</span>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={onLoginClick}
+                  className="relative group"
+                  title="Minha Conta / Fidelidade"
+                >
+                  {user.photoURL ? (
+                    <img 
+                      src={user.photoURL} 
+                      alt={user.displayName || ''} 
+                      className="w-8 h-8 rounded-full border-2 border-[#E63956]/20 group-hover:border-[#E63956] transition-colors" 
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[#E63956]/10 flex items-center justify-center text-[#E63956]">
+                      <UserIcon size={16} />
+                    </div>
+                  )}
+                </button>
+
+                <button 
+                  onClick={onLogoutClick} 
+                  className="text-[#3E2723]/30 hover:text-[#E63956] transition-colors p-1"
+                  title="Sair"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
             ) : (
-              <Crown size={16} className="text-[#E63956]" />
+              <button 
+                onClick={onLoginClick}
+                disabled={isLoggingIn}
+                aria-label="Entrar / Club Rayne"
+                className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-[#3E2723] font-bold text-xs md:text-sm bg-white border border-[#3E2723]/5 rounded-full hover:bg-[#F9F9F6] transition-all shadow-sm disabled:opacity-50"
+              >
+                {isLoggingIn ? (
+                  <Loader2 size={16} className="text-[#E63956] animate-spin" />
+                ) : (
+                  <Crown size={16} className="text-[#E63956]" />
+                )}
+                <span>Club Rayne</span>
+              </button>
             )}
-            <span>Club Rayne</span>
-          </button>
+          </div>
 
           <button 
             onClick={onMenuClick}

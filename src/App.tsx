@@ -6,7 +6,7 @@ import AdminPanel from './components/AdminPanel';
 import ClubRayne from './components/ClubRayne';
 import FeedbackModal from './components/FeedbackModal';
 import WhatsAppButton from './components/WhatsAppButton';
-import { INITIAL_PRODUCTS, INITIAL_LOYALTY_TIERS } from './data';
+import { INITIAL_PRODUCTS, INITIAL_LOYALTY_TIERS, INITIAL_CONFIG } from './data';
 import { Product, CartItem, LoyaltyTier, Coupon, DeliveryArea, StoreConfig } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, LogIn, Crown, History, Settings, LogOut, Sparkles, Star, Loader2, Clock } from 'lucide-react';
@@ -36,9 +36,9 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [activeCategory, setActiveCategory] = useState<'Tudo' | 'Sabores' | 'Outros'>('Tudo');
-  const [storeConfig, setStoreConfig] = useState<StoreConfig | null>(() => {
+  const [storeConfig, setStoreConfig] = useState<StoreConfig>(() => {
     const saved = localStorage.getItem('rayne_config');
-    return saved ? JSON.parse(saved) : null;
+    return saved ? JSON.parse(saved) : { id: 'settings', ...INITIAL_CONFIG };
   });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -119,8 +119,8 @@ export default function App() {
         const errorMessage = err.code === 'auth/unauthorized-domain' 
           ? `Domínio não autorizado: ${window.location.hostname}. Adicione este domínio no console do Firebase.`
           : err.code === 'auth/operation-not-supported-in-this-environment' || window.self !== window.top
-          ? "O login com o Google só pode ser realizado diretamente no site publicado (rayne-gourmet-7801e.web.app)"
-          : "Erro ao concluir login. Tente novamente no domínio oficial.";
+          ? "O login com o Google só pode ser realizado no domínio oficial da sua loja."
+          : "Erro ao concluir login. Verifique sua conexão e tente novamente.";
         
         console.warn(errorMessage);
         if (err.code !== 'auth/operation-not-supported-in-this-environment') {
@@ -226,6 +226,9 @@ export default function App() {
         const configData = { id: 'settings', ...snapshot.val() } as StoreConfig;
         setStoreConfig(configData);
         localStorage.setItem('rayne_config', JSON.stringify(configData));
+      } else {
+        // Se não existe no banco, usamos o padrão inicial e tentamos persistir
+        setStoreConfig({ id: 'settings', ...INITIAL_CONFIG } as StoreConfig);
       }
     }, (error) => {
       handleDatabaseError(error, OperationType.GET, 'config/settings');
@@ -279,23 +282,17 @@ export default function App() {
       return;
     }
     
-    // Verificação de Iframe para exibir aviso amigável
-    if (window.self !== window.top) {
-      alert("O login com o Google só pode ser realizado diretamente no site publicado (rayne-gourmet-7801e.web.app)");
-      return;
-    }
-    
     setIsLoggingIn(true);
     try {
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       setIsLoggingIn(false);
       console.error("Erro ao iniciar login:", err);
-      const errorMessage = err.code === 'auth/unauthorized-domain'
-        ? `Domínio não autorizado: ${window.location.hostname}. Adicione este domínio no console do Firebase.`
-        : (err.code === 'auth/operation-not-supported-in-this-environment' || window.self !== window.top)
-        ? "O login com o Google só pode ser realizado diretamente no site publicado (rayne-gourmet-7801e.web.app)"
-        : "Não foi possível iniciar o login. Tente novamente no domínio oficial.";
+      let errorMessage = "Não foi possível iniciar o login. Tente novamente no domínio oficial.";
+      
+      if (err.code === 'auth/unauthorized-domain') {
+        errorMessage = `Domínio não autorizado: ${window.location.hostname}. Adicione este domínio no console do Firebase.`;
+      }
       
       alert(errorMessage);
     }
@@ -340,14 +337,17 @@ export default function App() {
         onMenuClick={() => setIsCartOpen(true)} 
         onLoginClick={handleLogin}
         onAdminClick={() => setIsAdminOpen(true)}
+        onLogoutClick={handleLogout}
         cartCount={cartCount} 
         isAdmin={isAdmin}
-        isStoreOpen={storeConfig?.isOpen ?? true}
+        isStoreOpen={storeConfig.isOpen !== false}
         isLoggingIn={isLoggingIn}
+        user={user}
+        points={userOrders.length}
       />
 
       <main className="max-w-7xl mx-auto px-6 py-12 md:py-20">
-        {storeConfig?.isOpen === false && (
+        {storeConfig.isOpen === false && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -363,28 +363,7 @@ export default function App() {
           </motion.div>
         )}
 
-        {user && (
-          <div className="flex justify-end mb-8">
-            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-full border border-[#3E2723]/5 shadow-sm">
-              {user.photoURL && (
-                <img src={user.photoURL} alt={user.displayName || ''} className="w-6 h-6 rounded-full" />
-              )}
-              <span className="text-xs font-bold text-[#3E2723]">{user.displayName}</span>
-              {isAdmin && (
-                <button 
-                  onClick={() => setIsAdminOpen(true)}
-                  className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                  title="Painel de Gestão"
-                >
-                  <Settings size={16} />
-                </button>
-              )}
-              <button onClick={handleLogout} className="text-[#3E2723]/40 hover:text-[#E63956] transition-colors">
-                <LogOut size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+
         <section id="menu">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
@@ -440,18 +419,24 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="text-center md:text-left">
             <h4 className="text-white font-bold text-xl mb-2">Rayne Gourmet</h4>
-            <p className="text-sm">O melhor dindin gourmet da região.</p>
+            <p className="text-sm">{storeConfig?.address || 'O melhor dindin gourmet da região.'}</p>
           </div>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-[#E63956] transition-colors">Instagram</a>
-            <a href="https://wa.me/5597984493292" target="_blank" rel="noopener noreferrer" className="hover:text-[#E63956] transition-colors">WhatsApp</a>
-            <a href="#" className="hover:text-[#E63956] transition-colors">Facebook</a>
+            {storeConfig?.instagram && (
+              <a href={`https://instagram.com/${storeConfig.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-[#E63956] transition-colors font-bold">Instagram</a>
+            )}
+            {storeConfig?.phone && (
+              <a href={`https://wa.me/${storeConfig.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-[#E63956] transition-colors font-bold">WhatsApp</a>
+            )}
+            {storeConfig?.email && (
+              <a href={`mailto:${storeConfig.email}`} className="hover:text-[#E63956] transition-colors font-bold">E-mail</a>
+            )}
             <button onClick={() => setIsAdminOpen(true)} className="hover:text-white transition-colors flex items-center gap-1">
               <Settings size={14} />
               Gestão
             </button>
           </div>
-          <p className="text-xs">© 2024 Rayne Gourmet. Todos os direitos reservados.</p>
+          <p className="text-xs">© {new Date().getFullYear()} Rayne Gourmet. Todos os direitos reservados.</p>
         </div>
       </footer>
 
@@ -464,7 +449,7 @@ export default function App() {
         coupons={coupons}
         deliveryAreas={deliveryAreas}
         user={user}
-        isStoreOpen={storeConfig?.isOpen ?? true}
+        isStoreOpen={storeConfig.isOpen !== false}
       />
 
       <AdminPanel
@@ -473,6 +458,8 @@ export default function App() {
         products={products}
         loyaltyTiers={loyaltyTiers}
         user={user}
+        storeConfig={storeConfig}
+        setStoreConfig={setStoreConfig}
       />
 
       <FeedbackModal

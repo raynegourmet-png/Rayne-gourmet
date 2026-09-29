@@ -7,7 +7,7 @@
           "description": "O clássico sabor de pudim de leite condensado com calda de caramelo.",
           "price": 5.0,
           "category": "Especiais",
-          "image": "/src/assets/images/gourmet_dindin_pudim_amendoim_oreo_1789856646128.jpg",
+          "image": "/assets/images/gourmet_dindin_pudim_amendoim_oreo_1789856646128.jpg",
           "available": true,
           "sortOrder": 1
         },
@@ -16,7 +16,7 @@
           "description": "Azedinho do maracujá com uma casquinha crocante de chocolate.",
           "price": 6.0,
           "category": "Premium",
-          "image": "/src/assets/images/gourmet_dindin_premium_flavors_1789856658729.jpg",
+          "image": "/assets/images/gourmet_dindin_premium_flavors_1789856658729.jpg",
           "available": true,
           "sortOrder": 4
         }

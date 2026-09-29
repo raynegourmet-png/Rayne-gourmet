@@ -7,7 +7,9 @@ export interface Product {
   price: number;
   categoria: Category;
   image: string;
+  images?: string[];
   imagePath?: string;
+  imagePaths?: string[];
   available: boolean;
   stock: number;
 }
@@ -73,6 +75,8 @@ export interface StoreConfig {
   address: string;
   workingHours: string;
   pixKey: string;
+  email: string;
+  googleMapsLink?: string;
   deliveryFeeDefault: number;
   isOpen?: boolean;
 }

@@ -3,28 +3,9 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 
-// Credentials from the user's initial request (Production fallback)
-const PROD_CONFIG = {
-  apiKey: "AIzaSyAyDFe8jriSqx8IjWCYLKLpQwjwvZYLeYA",
-  authDomain: "rayne-gourmet-7801e.firebaseapp.com",
-  projectId: "rayne-gourmet-7801e",
-  storageBucket: "rayne-gourmet-7801e.appspot.com",
-  messagingSenderId: "1056346765278",
-  appId: "1:1056346765278:web:8a50f146c1f01dfa4674eb",
-  databaseURL: "https://rayne-gourmet-7801e-default-rtdb.firebaseio.com"
-};
-
-// Credentials from AI Studio (Development default)
-const DEV_CONFIG = {
-  apiKey: "AIzaSyCFKe12MyDKM2PQ5IXZIXORfM67JIA9eKI",
-  authDomain: "rayne-gourmet.firebaseapp.com",
-  projectId: "rayne-gourmet",
-  storageBucket: "rayne-gourmet.firebasestorage.app",
-  messagingSenderId: "1074178859385",
-  appId: "1:1074178859385:web:1257012b9632d834ca4fa8",
-  databaseURL: "https://rayne-gourmet-default-rtdb.firebaseio.com"
-};
-
+// Current AI Studio Project Credentials
+// Note: The previous "Production" project (rayne-gourmet-7801e) has been suspended.
+// We are now using the active "rayne-gourmet" project for all environments.
 const getEnv = (key: string, fallback: string): string => {
   try {
     const value = import.meta.env[key];
@@ -37,16 +18,21 @@ const getEnv = (key: string, fallback: string): string => {
   return fallback;
 };
 
-// Build config for initialization
+// Official config from firebase-applet-config.json
+const rawDbUrl = getEnv('VITE_FIREBASE_DATABASE_URL', 'https://rayne-gourmet-default-rtdb.firebaseio.com');
+// Force the correct URL and ignore the old "7801e" project if it appears in env
+const sanitizedDbUrl = (rawDbUrl && rawDbUrl.startsWith('http') && !rawDbUrl.includes('7801e')) 
+  ? rawDbUrl 
+  : 'https://rayne-gourmet-default-rtdb.firebaseio.com';
+
 const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY', DEV_CONFIG.apiKey),
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN', DEV_CONFIG.authDomain),
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID', DEV_CONFIG.projectId),
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET', DEV_CONFIG.storageBucket),
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID', DEV_CONFIG.messagingSenderId),
-  appId: getEnv('VITE_FIREBASE_APP_ID', DEV_CONFIG.appId),
-  // We explicitly omit databaseURL here and pass it to getDatabase later
-  // to avoid fatal errors during initializeApp if the URL is somehow mangled.
+  apiKey: getEnv('VITE_FIREBASE_API_KEY', 'AIzaSyCFKe12MyDKM2PQ5IXZIXORfM67JIA9eKI'),
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN', 'rayne-gourmet.firebaseapp.com'),
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID', 'rayne-gourmet'),
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET', 'rayne-gourmet.firebasestorage.app'),
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID', '1074178859385'),
+  appId: getEnv('VITE_FIREBASE_APP_ID', '1:1074178859385:web:1257012b9632d834ca4fa8'),
+  databaseURL: sanitizedDbUrl
 };
 
 // Initialize Firebase
@@ -56,45 +42,18 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const storage = getStorage(app);
 
-// Extremely robust RTDB initialization
+// Initialize RTDB safely
 let database;
-
-// Collect all candidate URLs to try
-const candidateUrls = [
-  getEnv('VITE_FIREBASE_DATABASE_URL', ''),
-  DEV_CONFIG.databaseURL,
-  PROD_CONFIG.databaseURL,
-  `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com`,
-  `https://${firebaseConfig.projectId}.firebaseio.com`,
-  `https://rayne-gourmet-default-rtdb.firebaseio.com`,
-  `https://rayne-gourmet-7801e-default-rtdb.firebaseio.com`
-];
-
-for (const rawUrl of candidateUrls) {
-  if (database) break;
-  
-  const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
-  if (!url || !url.startsWith('http') || url === 'undefined' || url === 'null') continue;
-  
-  try {
-    // Attempt initialization with this specific URL
-    database = getDatabase(app, url);
-    console.log(`Firebase RTDB successfully initialized with: ${url}`);
-  } catch (err) {
-    // This is expected if the URL is invalid or malformed
-    console.warn(`Failed to initialize RTDB with URL [${url}]:`, err);
-  }
-}
-
-// Final fallback: try standard initialization without explicit URL
-if (!database) {
-  try {
+try {
+  const dbUrl = firebaseConfig.databaseURL;
+  if (dbUrl && typeof dbUrl === 'string' && dbUrl.startsWith('http')) {
+    database = getDatabase(app, dbUrl);
+  } else {
     database = getDatabase(app);
-  } catch (err) {
-    console.error("FATAL: All Firebase RTDB initialization attempts failed.", err);
-    // As a last resort, to avoid crashing the whole import, return a dummy or re-throw
-    throw err;
   }
+} catch (err) {
+  console.warn("RTDB initialization with URL failed, falling back to default:", err);
+  database = getDatabase(app);
 }
 
-export const db = database!;
+export const db = database;

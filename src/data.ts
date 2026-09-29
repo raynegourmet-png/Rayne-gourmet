@@ -164,6 +164,7 @@ export const INITIAL_CONFIG: Omit<StoreConfig, 'id'> = {
   address: "Sua Cidade, AM",
   workingHours: "Segunda a Sábado: 08:00 - 18:00",
   pixKey: "seu-pix@email.com",
+  email: "raynegourmet@gmail.com",
   deliveryFeeDefault: 5.0,
   isOpen: true
 };

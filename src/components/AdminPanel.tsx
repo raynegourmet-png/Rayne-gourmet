@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Lock, X, Save, Power, Edit3, Trash2, History, Crown, Plus, LogOut, Mail, Loader2, Package, ImageIcon, Rocket, Check, Share2, Sparkles, BarChart3, PieChart, Ticket, Truck, MapPin, Clock, CreditCard, User as UserIcon, MessageSquare, Star, Users } from 'lucide-react';
 import { Product, Order, LoyaltyTier, Coupon, DeliveryArea, StoreConfig, OrderStatus, Category, Feedback } from '../types';
 import { addProduct, updateProduct, deleteProduct, updateLoyaltyTier, getOrders, getCoupons, addCoupon, updateCoupon, deleteCoupon, getDeliveryAreas, addDeliveryArea, updateDeliveryArea, deleteDeliveryArea, getStoreConfig, updateStoreConfig, updateOrder, deleteOrder, getFeedbacks, uploadImage, deleteImage, handleFirestoreError, handleDatabaseError, OperationType } from '../lib/db';
+import { INITIAL_CONFIG } from '../data';
 import { auth, googleProvider, db } from '../lib/firebase';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, User, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { ref, onValue, query, orderByChild, equalTo } from 'firebase/database';
@@ -14,21 +15,20 @@ interface AdminPanelProps {
   products: Product[];
   loyaltyTiers: LoyaltyTier[];
   user: User | null;
+  storeConfig: StoreConfig;
+  setStoreConfig: (config: StoreConfig) => void;
 }
 
 type Tab = 'resumo' | 'sabores' | 'outros' | 'fidelidade' | 'cupons' | 'entrega' | 'flyer' | 'config' | 'pedidos' | 'feedbacks' | 'clientes';
 
-export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, user }: AdminPanelProps) {
+export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, user, storeConfig, setStoreConfig }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('resumo');
-  const [email, setEmail] = useState('raynegourmet@gmail.com');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [deliveryAreas, setDeliveryAreas] = useState<DeliveryArea[]>([]);
-  const [storeConfig, setStoreConfig] = useState<StoreConfig | null>(null);
   const [error, setError] = useState('');
   
   // Flyer state
@@ -44,7 +44,9 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
     description: '',
     price: 5.0,
     categoria: 'Sabores 1',
-    image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=400&fit=crop',
+    image: '/assets/images/gourmet_dindin_premium_flavors_1789856658729.jpg',
+    images: [],
+    imagePaths: [],
     available: true,
     stock: 50
   });
@@ -103,18 +105,9 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
     let unsubscribeCoupons: (() => void) | null = null;
     let unsubscribeAreas: (() => void) | null = null;
     let unsubscribeFeedbacks: (() => void) | null = null;
-    let unsubscribeConfig: (() => void) | null = null;
 
     if (isAdmin) {
-      // Listen to store config in real-time
-      const configRef = ref(db, 'config/settings');
-      unsubscribeConfig = onValue(configRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setStoreConfig({ id: 'settings', ...snapshot.val() } as StoreConfig);
-        }
-      }, (err) => {
-        handleDatabaseError(err, OperationType.GET, 'config/settings');
-      });
+      // No internal config listener needed anymore as it's handled in App.tsx
 
       // Listen to all orders in real-time
       const ordersRef = ref(db, 'orders');
@@ -181,50 +174,24 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
       if (unsubscribeCoupons) unsubscribeCoupons();
       if (unsubscribeAreas) unsubscribeAreas();
       if (unsubscribeFeedbacks) unsubscribeFeedbacks();
-      if (unsubscribeConfig) unsubscribeConfig();
     };
   }, [isAdmin]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
-      console.error("Login error:", err);
-      if (err.code === 'auth/invalid-api-key') {
-        setError('Erro de configuração: Chave da API do Firebase inválida ou ausente no painel Secrets do AI Studio.');
-      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('E-mail ou senha incorretos.');
-      } else {
-        setError(`Erro ao logar: ${err.message}`);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
     
-    // Verificação de Iframe para exibir aviso amigável
-    if (window.self !== window.top) {
-      setError("O login com o Google só pode ser realizado diretamente no site publicado (rayne-gourmet-7801e.web.app)");
-      setIsLoading(false);
-      return;
-    }
-    
     try {
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       console.error("Google login error:", err);
-      const errorMessage = err.code === 'auth/unauthorized-domain'
-        ? `Domínio não autorizado: ${window.location.hostname}. Adicione este domínio no console do Firebase.`
-        : (err.code === 'auth/operation-not-supported-in-this-environment' || window.self !== window.top)
-        ? "O login com o Google só pode ser realizado diretamente no site publicado (rayne-gourmet-7801e.web.app)"
-        : `Erro ao iniciar login: ${err.message}`;
+      let errorMessage = `Erro ao iniciar login: ${err.message}`;
+      
+      if (err.code === 'auth/unauthorized-domain') {
+        errorMessage = `Domínio não autorizado: ${window.location.hostname}. Adicione este domínio no console do Firebase.`;
+      }
       
       setError(errorMessage);
       setIsLoading(false);
@@ -258,7 +225,14 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
     if (!isAdmin) return;
     setIsLoading(true);
     try {
-      await addProduct(newProduct);
+      // Use first image from gallery as main thumbnail if available
+      const productToSave = {
+        ...newProduct,
+        image: newProduct.images && newProduct.images.length > 0 ? newProduct.images[0] : newProduct.image,
+        imagePath: newProduct.imagePaths && newProduct.imagePaths.length > 0 ? newProduct.imagePaths[0] : (newProduct.imagePath || '')
+      };
+      
+      await addProduct(productToSave);
       setIsAdding(false);
       setNewProduct({
         name: '',
@@ -266,6 +240,8 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
         price: 5.0,
         categoria: 'Sabores 1',
         image: '/assets/images/gourmet_dindin_premium_flavors_1789856658729.jpg',
+        images: [],
+        imagePaths: [],
         available: true,
         stock: 50
       });
@@ -303,24 +279,44 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
 
   const toggleAvailability = async (product: Product) => {
     if (!isAdmin) return;
-    await updateProduct(product.id, { available: !product.available });
+    try {
+      await updateProduct(product.id, { available: !product.available });
+    } catch (err) {
+      console.error("Erro ao alternar disponibilidade:", err);
+      alert("Erro ao salvar alteração. Tente novamente.");
+    }
   };
 
   const onUpdatePrice = async (id: string, newPrice: string) => {
     if (!isAdmin) return;
-    const priceNum = parseFloat(newPrice) || 0;
-    await updateProduct(id, { price: priceNum });
+    try {
+      const priceNum = parseFloat(newPrice) || 0;
+      await updateProduct(id, { price: priceNum });
+    } catch (err) {
+      console.error("Erro ao atualizar preço:", err);
+      alert("Erro ao salvar preço.");
+    }
   };
 
   const onUpdateStock = async (id: string, newStock: string) => {
     if (!isAdmin) return;
-    const stockNum = parseInt(newStock) || 0;
-    await updateProduct(id, { stock: stockNum });
+    try {
+      const stockNum = parseInt(newStock) || 0;
+      await updateProduct(id, { stock: stockNum });
+    } catch (err) {
+      console.error("Erro ao atualizar estoque:", err);
+      alert("Erro ao salvar estoque.");
+    }
   };
 
   const onUpdateField = async (id: string, field: string, value: string) => {
     if (!isAdmin) return;
-    await updateProduct(id, { [field]: value });
+    try {
+      await updateProduct(id, { [field]: value });
+    } catch (err) {
+      console.error(`Erro ao atualizar ${field}:`, err);
+      alert(`Erro ao salvar ${field}.`);
+    }
   };
 
   const handleAddCoupon = async (e: React.FormEvent) => {
@@ -388,10 +384,12 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
     if (!isAdmin || !storeConfig) return;
     setIsLoading(true);
     try {
-      await updateStoreConfig(storeConfig);
-      alert('Configurações salvas!');
+      const { id, ...configData } = storeConfig;
+      await updateStoreConfig(configData);
+      alert('Configurações salvas com sucesso!');
     } catch (err) {
       console.error(err);
+      alert('Erro ao salvar configurações. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -433,174 +431,194 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
             />
             
             <motion.div
-              initial={{ y: "100%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative bg-white w-full h-full sm:h-[90vh] sm:max-w-4xl sm:rounded-[48px] overflow-hidden flex flex-col shadow-2xl"
+              initial={{ x: "100%", opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="relative bg-[#F9F9F6] w-full h-full sm:h-[95vh] sm:max-w-6xl sm:rounded-[40px] overflow-hidden flex flex-col sm:flex-row shadow-2xl"
             >
-              {/* Header */}
-              <div className="bg-[#3E2723] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/10 rounded-xl">
-                    <Settings size={20} className="sm:w-6 sm:h-6" />
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-bold tracking-tight">Gestão Rayne Gourmet</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  {user && (
-                    <button 
-                      onClick={handleLogout}
-                      className="p-2 hover:bg-white/10 rounded-full text-white/60 hover:text-white transition-colors"
-                      title="Sair"
-                    >
-                      <LogOut size={20} />
-                    </button>
-                  )}
-                  <button 
-                    onClick={onClose} 
-                    aria-label="Fechar painel de gestão"
-                    className="p-2 hover:bg-white/10 rounded-full"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-grow overflow-y-auto p-4 sm:p-8 custom-scrollbar">
-                {!isAdmin ? (
-                  <form onSubmit={handleLogin} className="max-w-md mx-auto py-4 sm:py-12">
-                    <div className="text-center mb-8">
-                      <div className="w-20 h-20 bg-[#E63956]/5 rounded-[32px] flex items-center justify-center mx-auto mb-6">
-                        <Lock size={40} className="text-[#E63956]" />
-                      </div>
-                      <h3 className="text-2xl font-black text-[#3E2723] uppercase tracking-tight mb-2">Painel Administrativo</h3>
-                      <p className="text-sm text-[#3E2723]/60 font-medium">Entre para gerenciar seu cardápio e pedidos.</p>
+              {/* Sidebar Navigation */}
+              <aside className="hidden sm:flex flex-col w-64 bg-[#3E2723] text-white shrink-0">
+                <div className="p-8">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                      <Settings size={24} className="text-[#E63956]" />
                     </div>
-                    
-                    <div className="space-y-4 mb-8">
-                      <div className="relative group">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3E2723]/30 group-focus-within:text-[#E63956] transition-colors" size={20} />
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="Seu e-mail"
-                          className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-2xl pl-12 pr-4 py-4 focus:bg-white focus:ring-4 focus:ring-[#E63956]/5 focus:border-[#E63956]/20 outline-none text-base font-bold transition-all shadow-inner"
-                          required
-                        />
+                    <div>
+                      <h2 className="text-lg font-black tracking-tighter leading-none">Painel ADM</h2>
+                      <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Rayne Gourmet</p>
+                    </div>
+                  </div>
+
+                  <nav className="space-y-1">
+                    {[
+                      { id: 'resumo', icon: BarChart3, label: 'Resumo' },
+                      { id: 'pedidos', icon: History, label: 'Pedidos' },
+                      { id: 'sabores', icon: Package, label: 'Sabores' },
+                      { id: 'outros', icon: PieChart, label: 'Outros Itens' },
+                      { id: 'clientes', icon: Users, label: 'Clientes' },
+                      { id: 'feedbacks', icon: MessageSquare, label: 'Feedbacks' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as Tab)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab.id ? 'bg-[#E63956] text-white shadow-lg shadow-[#E63956]/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                      >
+                        <tab.icon size={18} />
+                        {tab.label}
+                      </button>
+                    ))}
+                  </nav>
+
+                  <div className="my-6 border-t border-white/5 pt-6">
+                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em] mb-4 px-4">Configurações</p>
+                    <nav className="space-y-1">
+                      {[
+                        { id: 'fidelidade', icon: Crown, label: 'Fidelidade' },
+                        { id: 'cupons', icon: Ticket, label: 'Cupons' },
+                        { id: 'entrega', icon: Truck, label: 'Entrega' },
+                        { id: 'config', icon: Settings, label: 'Loja' },
+                        { id: 'flyer', icon: Rocket, label: 'Flyer' },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id as Tab)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab.id ? 'bg-[#E63956] text-white shadow-lg shadow-[#E63956]/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                        >
+                          <tab.icon size={18} />
+                          {tab.label}
+                        </button>
+                      ))}
+                    </nav>
+                  </div>
+                </div>
+
+                <div className="mt-auto p-8 border-t border-white/5">
+                  <div className="flex items-center gap-3 mb-6">
+                    {user?.photoURL ? (
+                      <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full border border-white/10" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center"><UserIcon size={14} /></div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black truncate">{user?.displayName?.split(' ')[0]}</p>
+                      <button onClick={handleLogout} className="text-[9px] font-black text-[#E63956] uppercase hover:underline">Sair</button>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              {/* Main Content Area */}
+              <div className="flex-grow flex flex-col min-w-0">
+                {/* Mobile Top Header */}
+                <div className="sm:hidden bg-[#3E2723] text-white p-4 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Settings size={20} className="text-[#E63956]" />
+                    <h2 className="text-sm font-black uppercase tracking-tighter">Painel de Gestão</h2>
+                  </div>
+                  <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full"><X size={24} /></button>
+                </div>
+
+                {/* Mobile Tab Nav */}
+                <div className="sm:hidden bg-white border-b border-[#3E2723]/5 px-4 py-2 overflow-x-auto no-scrollbar flex gap-2">
+                  {[
+                    { id: 'resumo', label: 'Resumo' },
+                    { id: 'pedidos', label: 'Pedidos' },
+                    { id: 'sabores', label: 'Sabores' },
+                    { id: 'config', label: 'Loja' },
+                    { id: 'clientes', label: 'Clientes' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as Tab)}
+                      className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-[#E63956] text-white' : 'text-[#3E2723]/40'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Content Header (Desktop) */}
+                <header className="hidden sm:flex items-center justify-between px-8 py-6 bg-white border-b border-[#3E2723]/5">
+                  <div>
+                    <h3 className="text-2xl font-black text-[#3E2723] uppercase tracking-tight">
+                      {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                    </h3>
+                    <p className="text-xs font-bold text-[#3E2723]/40 uppercase tracking-widest mt-1">Gerencie seu negócio em tempo real</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={async () => {
+                        const currentStatus = storeConfig.isOpen !== false;
+                        const newStatus = !currentStatus;
+                        setStoreConfig({...storeConfig, isOpen: newStatus});
+                        try {
+                          await updateStoreConfig({ isOpen: newStatus });
+                        } catch (err) {
+                          alert("Erro ao atualizar status da loja.");
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-2xl border transition-all active:scale-95 ${storeConfig.isOpen !== false ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${storeConfig.isOpen !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        Loja {storeConfig.isOpen !== false ? 'Aberta' : 'Fechada'}
+                      </span>
+                    </button>
+                    <button onClick={onClose} className="p-2 hover:bg-[#F9F9F6] rounded-2xl text-[#3E2723]/20 hover:text-[#3E2723] transition-all"><X size={24} /></button>
+                  </div>
+                </header>
+
+                <main className="flex-grow overflow-y-auto p-4 sm:p-8 custom-scrollbar">
+                {!isAdmin ? (
+                  <div className="max-w-md mx-auto py-12">
+                    <div className="text-center mb-10">
+                      <div className="w-24 h-24 bg-[#E63956]/5 rounded-[40px] flex items-center justify-center mx-auto mb-6">
+                        <Lock size={48} className="text-[#E63956]" />
                       </div>
-                      <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3E2723]/30 group-focus-within:text-[#E63956] transition-colors" size={20} />
-                        <input
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Sua senha"
-                          className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-2xl pl-12 pr-4 py-4 focus:bg-white focus:ring-4 focus:ring-[#E63956]/5 focus:border-[#E63956]/20 outline-none text-base font-bold transition-all shadow-inner"
-                          required
-                        />
-                      </div>
+                      <h3 className="text-3xl font-black text-[#3E2723] uppercase tracking-tight mb-3">Painel Administrativo</h3>
+                      <p className="text-sm text-[#3E2723]/60 font-medium px-8">Acesse com sua conta autorizada para gerenciar cardápio e pedidos.</p>
                     </div>
 
                     {error && (
                       <motion.div 
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-[#E63956] text-xs mb-6 font-black uppercase tracking-wider text-center p-4 bg-[#E63956]/5 rounded-2xl border border-[#E63956]/10"
+                        className="text-[#E63956] text-xs mb-8 font-black uppercase tracking-wider text-center p-4 bg-[#E63956]/5 rounded-2xl border border-[#E63956]/10"
                       >
                         {error}
                       </motion.div>
                     )}
 
-                    <div className="space-y-4">
-                      <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-[#E63956] text-white py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-[#E63956]/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
-                      >
-                        {isLoading ? <Loader2 size={24} className="animate-spin" /> : <><Power size={20} /> Acessar Painel</>}
-                      </button>
-
-                      <div className="flex items-center gap-4 py-2">
-                        <div className="flex-grow h-px bg-[#3E2723]/10"></div>
-                        <span className="text-[10px] font-black text-[#3E2723]/30 uppercase tracking-[0.3em]">Ou entre com</span>
-                        <div className="flex-grow h-px bg-[#3E2723]/10"></div>
-                      </div>
-
+                    <div className="space-y-6">
                       <button
                         type="button"
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
-                        className="w-full bg-white border-2 border-[#3E2723]/5 text-[#3E2723] py-4 rounded-2xl font-black uppercase tracking-[0.2em] hover:bg-[#F9F9F6] active:scale-95 transition-all flex items-center justify-center gap-3 shadow-sm"
+                        className="w-full bg-white border-2 border-[#3E2723]/5 text-[#3E2723] py-5 rounded-3xl font-black uppercase tracking-[0.2em] hover:bg-[#F9F9F6] active:scale-95 transition-all flex items-center justify-center gap-4 shadow-xl shadow-black/5"
                       >
-                        <svg className="w-6 h-6" viewBox="0 0 24 24">
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                        </svg>
-                        Google Account
+                        {isLoading ? (
+                          <Loader2 size={24} className="animate-spin text-[#E63956]" />
+                        ) : (
+                          <>
+                            <svg className="w-6 h-6" viewBox="0 0 24 24">
+                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                            </svg>
+                            Entrar com Google
+                          </>
+                        )}
                       </button>
+                      
+                      <p className="text-[10px] text-center font-black text-[#3E2723]/30 uppercase tracking-[0.2em]">
+                        Somente administradores autorizados
+                      </p>
                     </div>
-                  </form>
+                  </div>
                 ) : (
-                  <div className="space-y-6 sm:space-y-8">
-                    {/* Admin Header Info */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-[#E63956]/5 rounded-3xl border border-[#E63956]/10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#E63956] rounded-2xl flex items-center justify-center text-white text-xs font-black tracking-tighter shadow-lg shadow-[#E63956]/20">
-                          RG
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-[#3E2723] uppercase tracking-[0.2em] mb-0.5">Admin Autenticado</p>
-                          <p className="text-xs font-bold text-[#3E2723]/60 leading-none">{user?.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-[#E63956]/10">
-                        <p className="text-[10px] font-black text-[#3E2723]/40 uppercase tracking-widest sm:hidden">Controles</p>
-                        <div className="flex gap-2">
-                          <button className="p-2.5 bg-white rounded-xl border border-[#3E2723]/5 text-[#3E2723]/60 hover:text-[#E63956] transition-colors shadow-sm">
-                            <Mail size={16} />
-                          </button>
-                          <button 
-                            onClick={handleLogout}
-                            className="p-2.5 bg-white rounded-xl border border-[#3E2723]/5 text-[#E63956] hover:bg-[#E63956] hover:text-white transition-all shadow-sm"
-                          >
-                            <LogOut size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Tabs Navigation */}
-                    <div className="sticky top-0 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 bg-white/80 backdrop-blur-md py-2">
-                      <div className="flex gap-2 p-1 bg-[#F9F9F6] rounded-2xl border border-[#3E2723]/5 overflow-x-auto no-scrollbar scroll-smooth">
-                        {[
-                          { id: 'resumo', icon: BarChart3, label: 'Resumo', color: '#3E2723' },
-                          { id: 'pedidos', icon: History, label: 'Pedidos', color: '#2563EB' },
-                          { id: 'sabores', icon: Package, label: 'Sabores', color: '#E63956' },
-                          { id: 'outros', icon: PieChart, label: 'Outros', color: '#0EA5E9' },
-                          { id: 'fidelidade', icon: Crown, label: 'Fidelidade', color: '#F59E0B' },
-                          { id: 'cupons', icon: Ticket, label: 'Cupons', color: '#A855F7' },
-                          { id: 'entrega', icon: Truck, label: 'Entrega', color: '#10B981' },
-                          { id: 'flyer', icon: Rocket, label: 'Flyer', color: '#EC4899' },
-                          { id: 'feedbacks', icon: MessageSquare, label: 'Feedbacks', color: '#4F46E5' },
-                          { id: 'config', icon: Settings, label: 'Config', color: '#475569' },
-                          { id: 'clientes', icon: Users, label: 'Ranking', color: '#EA580C' },
-                        ].map((tab) => (
-                          <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as Tab)}
-                            className={`shrink-0 flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab.id ? 'text-white shadow-xl scale-[1.02]' : 'text-[#3E2723]/40 hover:text-[#3E2723] hover:bg-white'}`}
-                            style={{ backgroundColor: activeTab === tab.id ? tab.color : 'transparent' }}
-                          >
-                            <tab.icon size={16} />
-                            {tab.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
 
                     <div className="mt-6">
                       {activeTab === 'clientes' && (
@@ -856,39 +874,64 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                                     />
                                   </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-black uppercase text-[#E63956]/40">Foto do Sabor</label>
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-2xl bg-white border border-[#E63956]/10 flex items-center justify-center overflow-hidden shrink-0">
-                                      {newProduct.image ? (
-                                        <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover" />
-                                      ) : isUploading ? (
-                                        <Loader2 size={24} className="text-[#E63956] animate-spin" />
-                                      ) : (
-                                        <ImageIcon size={24} className="text-[#E63956]/20" />
-                                      )}
-                                    </div>
-                                    <div className="flex-grow">
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        disabled={isUploading}
-                                        onChange={e => {
-                                          const file = e.target.files?.[0];
-                                          if (file) handleImageUpload(file, (url, path) => setNewProduct({...newProduct, image: url, imagePath: path}));
-                                        }}
-                                        className="hidden"
-                                        id="new-product-image"
-                                      />
-                                      <label 
-                                        htmlFor="new-product-image"
-                                        className="flex items-center justify-center gap-2 w-full bg-white border border-[#E63956]/10 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-wider text-[#E63956] cursor-pointer hover:bg-[#E63956]/5 transition-colors"
-                                      >
-                                        <ImageIcon size={14} />
-                                        Selecionar Foto
-                                      </label>
-                                    </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black uppercase text-[#E63956]/40">Galeria de Fotos (Múltiplas)</label>
+                                  <div className="flex flex-wrap gap-3">
+                                    {newProduct.images?.map((img, idx) => (
+                                      <div key={idx} className="relative group w-20 h-20 rounded-2xl bg-white border border-[#E63956]/10 overflow-hidden shadow-sm">
+                                        <img src={img} alt="" className="w-full h-full object-cover" />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const newImages = [...(newProduct.images || [])];
+                                            const newPaths = [...(newProduct.imagePaths || [])];
+                                            newImages.splice(idx, 1);
+                                            newPaths.splice(idx, 1);
+                                            setNewProduct({...newProduct, images: newImages, imagePaths: newPaths});
+                                          }}
+                                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                    
+                                    {isUploading ? (
+                                      <div className="w-20 h-20 rounded-2xl bg-white border border-dashed border-[#E63956]/20 flex items-center justify-center">
+                                        <Loader2 size={20} className="text-[#E63956] animate-spin" />
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          multiple
+                                          onChange={async (e) => {
+                                            const files = Array.from(e.target.files || []);
+                                            for (const file of files) {
+                                              await handleImageUpload(file, (url, path) => {
+                                                setNewProduct(prev => ({
+                                                  ...prev,
+                                                  images: [...(prev.images || []), url],
+                                                  imagePaths: [...(prev.imagePaths || []), path]
+                                                }));
+                                              });
+                                            }
+                                          }}
+                                          className="hidden"
+                                          id="new-product-images"
+                                        />
+                                        <label 
+                                          htmlFor="new-product-images"
+                                          className="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-[#E63956]/10 flex flex-col items-center justify-center gap-1 text-[#E63956]/40 cursor-pointer hover:bg-[#E63956]/5 transition-colors"
+                                        >
+                                          <Plus size={20} />
+                                          <span className="text-[8px] font-black uppercase">Foto</span>
+                                        </label>
+                                      </>
+                                    )}
                                   </div>
+                                  <p className="text-[9px] font-bold text-[#E63956]/30 uppercase italic">Dica: A primeira foto será a capa do produto.</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-1">
@@ -1468,88 +1511,132 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                             <h3 className="font-black uppercase text-sm tracking-widest">Informações da Loja</h3>
                           </div>
 
-                          <form onSubmit={handleUpdateConfig} className="space-y-4">
-                            <div className="bg-[#3E2723]/5 p-4 rounded-2xl flex items-center justify-between border border-[#3E2723]/5">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${storeConfig?.isOpen !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                  <Power size={18} />
+                          <form onSubmit={handleUpdateConfig} className="space-y-8 pb-20">
+                            {/* Status Section */}
+                            <div className="space-y-4">
+                              <h4 className="text-[10px] font-black uppercase text-[#3E2723]/40 tracking-[0.2em] border-b border-[#3E2723]/5 pb-2">Status da Operação</h4>
+                              <div className="bg-white p-6 rounded-3xl flex items-center justify-between border border-[#3E2723]/5 shadow-sm">
+                                <div className="flex items-center gap-4">
+                                  <div className={`p-3 rounded-2xl ${storeConfig.isOpen !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                    <Power size={24} />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase text-[#3E2723]/40 tracking-wider">Disponibilidade</p>
+                                    <p className={`text-lg font-black ${storeConfig.isOpen !== false ? 'text-green-600' : 'text-red-600'}`}>
+                                      {storeConfig.isOpen !== false ? 'Loja Aberta' : 'Loja Fechada'}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="text-[10px] font-black uppercase text-[#3E2723]/40 tracking-wider">Status da Loja</p>
-                                  <p className={`text-sm font-black ${storeConfig?.isOpen !== false ? 'text-green-600' : 'text-red-600'}`}>
-                                    {storeConfig?.isOpen !== false ? 'Aberta para Pedidos' : 'Loja Fechada'}
-                                  </p>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentStatus = storeConfig.isOpen !== false;
+                                    setStoreConfig({...storeConfig, isOpen: !currentStatus});
+                                  }}
+                                  className={`w-14 h-8 rounded-full p-1.5 transition-all flex items-center ${storeConfig.isOpen !== false ? 'bg-green-500' : 'bg-red-500'}`}
+                                >
+                                  <motion.div
+                                    layout
+                                    className={`w-5 h-5 rounded-full bg-white shadow-md ${storeConfig.isOpen !== false ? 'ml-auto' : ''}`}
+                                  />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const currentStatus = storeConfig?.isOpen !== false;
-                                  const newStatus = !currentStatus;
-                                  setStoreConfig(prev => prev ? {...prev, isOpen: newStatus} : ({ isOpen: newStatus } as any));
-                                  await updateStoreConfig({ isOpen: newStatus });
-                                }}
-                                className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${storeConfig?.isOpen !== false ? 'bg-green-500' : 'bg-red-500'}`}
-                              >
-                                <motion.div
-                                  layout
-                                  className={`w-4 h-4 rounded-full bg-white shadow-sm ${storeConfig?.isOpen !== false ? 'ml-auto' : ''}`}
-                                />
-                              </button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-[#3E2723]/40">WhatsApp</label>
-                                <input
-                                  type="text"
-                                  value={storeConfig?.phone || ''}
-                                  onChange={e => setStoreConfig(prev => prev ? {...prev, phone: e.target.value} : null)}
-                                  className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                                />
+                            {/* Contact Section */}
+                            <div className="space-y-4">
+                              <h4 className="text-[10px] font-black uppercase text-[#3E2723]/40 tracking-[0.2em] border-b border-[#3E2723]/5 pb-2">Dados de Contato</h4>
+                              <div className="bg-white p-6 rounded-3xl border border-[#3E2723]/5 shadow-sm space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase text-[#3E2723]/40">WhatsApp</label>
+                                    <input
+                                      type="text"
+                                      value={storeConfig.phone}
+                                      onChange={e => setStoreConfig({...storeConfig, phone: e.target.value})}
+                                      className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                      placeholder="Ex: 5597984493292"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Instagram (usuário)</label>
+                                    <input
+                                      type="text"
+                                      value={storeConfig.instagram}
+                                      onChange={e => setStoreConfig({...storeConfig, instagram: e.target.value})}
+                                      className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                      placeholder="Ex: rayne_gourmet"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-[#3E2723]/40">E-mail Público</label>
+                                  <input
+                                    type="email"
+                                    value={storeConfig.email}
+                                    onChange={e => setStoreConfig({...storeConfig, email: e.target.value})}
+                                    className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Horário de Funcionamento</label>
+                                  <input
+                                    type="text"
+                                    value={storeConfig.workingHours}
+                                    onChange={e => setStoreConfig({...storeConfig, workingHours: e.target.value})}
+                                    className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                  />
+                                </div>
                               </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Instagram</label>
-                                <input
-                                  type="text"
-                                  value={storeConfig?.instagram || ''}
-                                  onChange={e => setStoreConfig(prev => prev ? {...prev, instagram: e.target.value} : null)}
-                                  className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                                />
+                            </div>
+
+                            {/* Payment & Location Section */}
+                            <div className="space-y-4">
+                              <h4 className="text-[10px] font-black uppercase text-[#3E2723]/40 tracking-[0.2em] border-b border-[#3E2723]/5 pb-2">Pagamento e Localização</h4>
+                              <div className="bg-white p-6 rounded-3xl border border-[#3E2723]/5 shadow-sm space-y-4">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Chave PIX</label>
+                                  <input
+                                    type="text"
+                                    value={storeConfig.pixKey}
+                                    onChange={e => setStoreConfig({...storeConfig, pixKey: e.target.value})}
+                                    className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Link do Google Maps</label>
+                                  <input
+                                    type="text"
+                                    value={storeConfig.googleMapsLink || ''}
+                                    onChange={e => setStoreConfig({...storeConfig, googleMapsLink: e.target.value})}
+                                    className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                    placeholder="https://maps.app.goo.gl/..."
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Endereço Físico</label>
+                                  <textarea
+                                    value={storeConfig.address}
+                                    onChange={e => setStoreConfig({...storeConfig, address: e.target.value})}
+                                    className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-4 py-3 text-sm outline-none font-bold h-24 resize-none"
+                                  />
+                                </div>
                               </div>
                             </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Horário de Funcionamento</label>
-                              <input
-                                type="text"
-                                value={storeConfig?.workingHours || ''}
-                                onChange={e => setStoreConfig(prev => prev ? {...prev, workingHours: e.target.value} : null)}
-                                className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Chave PIX</label>
-                              <input
-                                type="text"
-                                value={storeConfig?.pixKey || ''}
-                                onChange={e => setStoreConfig(prev => prev ? {...prev, pixKey: e.target.value} : null)}
-                                className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Endereço</label>
-                              <textarea
-                                value={storeConfig?.address || ''}
-                                onChange={e => setStoreConfig(prev => prev ? {...prev, address: e.target.value} : null)}
-                                className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold h-20 resize-none"
-                              />
-                            </div>
+
                             <button
                               type="submit"
                               disabled={isLoading}
-                              className="w-full bg-[#3E2723] text-white py-4 rounded-[24px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95"
+                              className="w-full bg-[#3E2723] text-white py-5 rounded-[28px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-[#3E2723]/20 transition-all active:scale-95 flex items-center justify-center gap-3"
                             >
-                              {isLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : 'Salvar Alterações'}
+                              {isLoading ? (
+                                <Loader2 size={24} className="animate-spin" />
+                              ) : (
+                                <>
+                                  <Save size={20} />
+                                  Salvar Todas as Alterações
+                                </>
+                              )}
                             </button>
                           </form>
                         </section>
@@ -1644,8 +1731,8 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                         </section>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </main>
               </div>
             </motion.div>
           </div>
@@ -1865,41 +1952,102 @@ function ProductListItem({ product, onUpdatePrice, onUpdateStock, onUpdateField,
                   <option value="Outros">Outros</option>
                 </select>
               </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-[#3E2723]/40 mb-2 block">Atualizar Imagem</label>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl border border-[#3E2723]/5 overflow-hidden shrink-0 bg-white flex items-center justify-center">
+              <div className="space-y-3">
+                <label className="text-[9px] font-black uppercase text-[#3E2723]/40 block border-b border-[#3E2723]/5 pb-1">Gerenciar Galeria</label>
+                <div className="flex flex-wrap gap-2">
+                  {/* Current images in gallery */}
+                  {(product.images && product.images.length > 0 ? product.images : [product.image]).map((img, idx) => (
+                    <div key={idx} className="relative group w-14 h-14 rounded-xl bg-white border border-[#3E2723]/5 overflow-hidden shadow-sm">
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newImages = [...(product.images || [product.image])];
+                          const newPaths = [...(product.imagePaths || [product.imagePath || ''])];
+                          
+                          // If we are deleting the only image, don't allow it
+                          if (newImages.length <= 1) {
+                            alert("O produto deve ter pelo menos uma foto.");
+                            return;
+                          }
+
+                          // Delete from storage if possible
+                          if (newPaths[idx] && newPaths[idx] !== 'base64') {
+                            await deleteImage(newPaths[idx]);
+                          }
+
+                          newImages.splice(idx, 1);
+                          newPaths.splice(idx, 1);
+                          
+                          // Update product with new arrays and update main thumbnail to the new first image
+                          await updateProduct(product.id, {
+                            images: newImages,
+                            imagePaths: newPaths,
+                            image: newImages[0],
+                            imagePath: newPaths[0]
+                          });
+                        }}
+                        className="absolute inset-0 bg-red-500/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add new image to gallery button */}
+                  <div className="relative w-14 h-14">
                     {isUploading ? (
-                      <Loader2 size={16} className="text-[#E63956] animate-spin" />
+                      <div className="w-full h-full rounded-xl bg-white border border-[#3E2723]/5 flex items-center justify-center">
+                        <Loader2 size={16} className="text-[#E63956] animate-spin" />
+                      </div>
                     ) : (
-                      <img src={product.image} alt="Preview" className="w-full h-full object-cover" />
+                      <>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsUploading(true);
+                            try {
+                              const timestamp = Date.now();
+                              const storagePath = `products/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+                              const { url, path } = await uploadImage(file, storagePath);
+                              
+                              const currentImages = product.images && product.images.length > 0 ? product.images : [product.image];
+                              const currentPaths = product.imagePaths && product.imagePaths.length > 0 ? product.imagePaths : [product.imagePath || ''];
+                              
+                              await updateProduct(product.id, {
+                                images: [...currentImages, url],
+                                imagePaths: [...currentPaths, path]
+                              });
+                            } catch (err) {
+                              console.error("Add image to gallery failed:", err);
+                              alert("Falha ao adicionar imagem.");
+                            } finally {
+                              setIsUploading(false);
+                            }
+                          }}
+                          className="hidden"
+                          id={`add-to-gallery-${product.id}`}
+                        />
+                        <label 
+                          htmlFor={`add-to-gallery-${product.id}`}
+                          className="w-full h-full rounded-xl bg-white border border-dashed border-[#3E2723]/20 flex items-center justify-center text-[#3E2723]/20 hover:text-[#E63956] hover:border-[#E63956]/40 cursor-pointer transition-all"
+                        >
+                          <Plus size={16} />
+                        </label>
+                      </>
                     )}
                   </div>
-                  <div className="flex-grow">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploading}
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) handleUpdateImage(file);
-                      }}
-                      className="hidden"
-                      id={`edit-image-${product.id}`}
-                    />
-                    <label 
-                      htmlFor={`edit-image-${product.id}`}
-                      className="flex items-center justify-center gap-2 w-full bg-white border border-[#3E2723]/10 rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-wider text-[#3E2723] cursor-pointer hover:bg-[#3E2723]/5 transition-colors"
-                    >
-                      <ImageIcon size={12} />
-                      Trocar Foto
-                    </label>
-                  </div>
+                </div>
+                <p className="text-[8px] font-black text-[#3E2723]/30 uppercase tracking-tighter">A primeira foto é sempre a capa oficial do produto.</p>
+                <div className="pt-2">
                   <button 
                     onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 bg-[#3E2723] text-white text-[9px] font-black uppercase rounded-xl"
+                    className="w-full py-2 bg-[#3E2723] text-white text-[9px] font-black uppercase rounded-xl shadow-lg shadow-black/10 active:scale-95 transition-all"
                   >
-                    OK
+                    Finalizar Edição
                   </button>
                 </div>
               </div>
