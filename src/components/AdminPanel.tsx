@@ -19,7 +19,7 @@ interface AdminPanelProps {
   setStoreConfig: (config: StoreConfig) => void;
 }
 
-type Tab = 'resumo' | 'sabores' | 'outros' | 'fidelidade' | 'cupons' | 'entrega' | 'flyer' | 'config' | 'pedidos' | 'feedbacks' | 'clientes';
+type Tab = 'resumo' | 'produtos' | 'fidelidade' | 'cupons' | 'entrega' | 'flyer' | 'config' | 'pedidos' | 'feedbacks' | 'clientes';
 
 export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, user, storeConfig, setStoreConfig }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('resumo');
@@ -454,8 +454,7 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                     {[
                       { id: 'resumo', icon: BarChart3, label: 'Resumo' },
                       { id: 'pedidos', icon: History, label: 'Pedidos' },
-                      { id: 'sabores', icon: Package, label: 'Sabores' },
-                      { id: 'outros', icon: PieChart, label: 'Outros Itens' },
+                      { id: 'produtos', icon: Package, label: 'Produtos' },
                       { id: 'clientes', icon: Users, label: 'Clientes' },
                       { id: 'feedbacks', icon: MessageSquare, label: 'Feedbacks' },
                     ].map((tab) => (
@@ -817,7 +816,7 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                         </section>
                       )}
 
-                      {activeTab === 'sabores' && (
+                      {activeTab === 'produtos' && (
                         <section className="space-y-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-[#3E2723]">
@@ -825,60 +824,68 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                                 <Package size={18} className="text-[#E63956]" />
                               </div>
                               <div>
-                                <h3 className="font-black uppercase text-sm tracking-widest">Gestão de Sabores</h3>
-                                <p className="text-[10px] text-[#3E2723]/40 font-bold uppercase tracking-tighter">Estoque e Preços dos Dindins</p>
+                                <h3 className="font-black uppercase text-sm tracking-widest">Gestão de Produtos</h3>
+                                <p className="text-[10px] text-[#3E2723]/40 font-bold uppercase tracking-tighter">Edite o cardápio que aparece no site</p>
                               </div>
                             </div>
                             <button
                               onClick={() => {
                                 setIsAdding(true);
-                                setNewProduct(prev => ({ ...prev, categoria: 'Sabores' }));
+                                setNewProduct(prev => ({ 
+                                  ...prev, 
+                                  name: '',
+                                  description: '',
+                                  images: [],
+                                  imagePaths: [],
+                                  categoria: 'Sabores' 
+                                }));
                               }}
                               className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#E63956] bg-[#E63956]/5 px-4 py-2 rounded-xl hover:bg-[#E63956]/10 transition-colors"
                             >
                               <Plus size={16} />
-                              Novo Sabor
+                              Adicionar Produto
                             </button>
                           </div>
 
                           <AnimatePresence>
-                            {isAdding && (newProduct.categoria?.startsWith('Sabores') || newProduct.categoria === 'Sabores') && (
+                            {isAdding && (
                               <motion.form
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
                                 onSubmit={handleAddProduct}
-                                className="bg-[#E63956]/5 p-6 rounded-[32px] border border-[#E63956]/20 space-y-4 overflow-hidden mb-6"
+                                className="bg-[#F9F9F6] p-6 rounded-[32px] border border-[#3E2723]/5 space-y-4 overflow-hidden mb-6 shadow-sm"
                               >
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#E63956]/40">Nome do Sabor</label>
+                                    <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Nome do Produto</label>
                                     <input
                                       type="text"
                                       required
                                       value={newProduct.name}
                                       onChange={e => setNewProduct({...newProduct, name: e.target.value})}
-                                      className="w-full bg-white border border-[#E63956]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
+                                      className="w-full bg-white border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
                                       placeholder="Ex: Dindin Gourmet Morango"
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#E63956]/40">Preço (R$)</label>
+                                    <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Preço (R$)</label>
                                     <input
                                       type="number"
                                       step="0.5"
                                       required
                                       value={newProduct.price}
                                       onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
-                                      className="w-full bg-white border border-[#E63956]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
+                                      className="w-full bg-white border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
                                     />
                                   </div>
                                 </div>
+
                                 <div className="space-y-2">
-                                  <label className="text-[10px] font-black uppercase text-[#E63956]/40">Galeria de Fotos (Múltiplas)</label>
+                                  <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Galeria de Fotos</label>
                                   <div className="flex flex-wrap gap-3">
                                     {newProduct.images?.map((img, idx) => (
-                                      <div key={idx} className="relative group w-20 h-20 rounded-2xl bg-white border border-[#E63956]/10 overflow-hidden shadow-sm">
+                                      <div key={idx} className="relative group w-20 h-20 rounded-2xl bg-white border border-[#3E2723]/5 overflow-hidden shadow-sm">
                                         <img src={img} alt="" className="w-full h-full object-cover" />
                                         <button
                                           type="button"
@@ -919,10 +926,10 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                                             }
                                           }}
                                           className="hidden"
-                                          id="new-product-images"
+                                          id="new-product-images-universal"
                                         />
                                         <label 
-                                          htmlFor="new-product-images"
+                                          htmlFor="new-product-images-universal"
                                           className="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-[#E63956]/10 flex flex-col items-center justify-center gap-1 text-[#E63956]/40 cursor-pointer hover:bg-[#E63956]/5 transition-colors"
                                         >
                                           <Plus size={20} />
@@ -931,235 +938,85 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                                       </>
                                     )}
                                   </div>
-                                  <p className="text-[9px] font-bold text-[#E63956]/30 uppercase italic">Dica: A primeira foto será a capa do produto.</p>
                                 </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#E63956]/40">Categoria</label>
+                                    <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Categoria</label>
                                       <select
                                         value={newProduct.categoria}
                                         onChange={e => setNewProduct({...newProduct, categoria: e.target.value as Category})}
-                                        className="w-full bg-white border border-[#E63956]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
+                                        className="w-full bg-white border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
                                       >
                                         <option value="Sabores">Sabores (Geral)</option>
-                                        <option value="Sabores Especiais">Sabores Especiais (R$ 5,00)</option>
-                                        <option value="Sabores Premium">Sabores Premium (R$ 6,00)</option>
+                                        <option value="Sabores Especiais">Sabores Especiais</option>
+                                        <option value="Sabores Premium">Sabores Premium</option>
+                                        <option value="Outros">Outros</option>
                                       </select>
                                   </div>
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#E63956]/40">Estoque Inicial</label>
+                                    <label className="text-[10px] font-black uppercase text-[#3E2723]/40">Estoque Inicial</label>
                                     <input
                                       type="number"
                                       value={newProduct.stock}
                                       onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value) || 0})}
-                                      className="w-full bg-white border border-[#E63956]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
+                                      className="w-full bg-white border border-[#3E2723]/5 rounded-xl px-3 py-2 text-sm outline-none font-bold"
                                     />
                                   </div>
                                 </div>
                                 <div className="flex gap-2 pt-2">
-                                  <button type="button" onClick={() => setIsAdding(false)} className="flex-1 bg-white text-[#E63956] py-3 rounded-2xl font-black text-xs uppercase border border-[#E63956]/10">Cancelar</button>
-                                  <button type="submit" disabled={isLoading} className="flex-1 bg-[#E63956] text-white py-3 rounded-2xl font-black text-xs uppercase shadow-lg shadow-[#E63956]/20 flex items-center justify-center gap-2">
-                                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Confirmar Sabor'}
+                                  <button type="button" onClick={() => setIsAdding(false)} className="flex-1 bg-white text-[#3E2723] py-3 rounded-2xl font-black text-xs uppercase border border-[#3E2723]/5">Cancelar</button>
+                                  <button type="submit" disabled={isLoading} className="flex-1 bg-[#3E2723] text-white py-3 rounded-2xl font-black text-xs uppercase shadow-lg shadow-black/20 flex items-center justify-center gap-2">
+                                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Confirmar Cadastro'}
                                   </button>
                                 </div>
                               </motion.form>
                             )}
                           </AnimatePresence>
 
-                          {/* Product List for Flavors */}
                           <div className="space-y-8">
                             {(() => {
-                              const flavorProducts = products.filter(p => 
-                                p.categoria?.startsWith('Sabores') || 
-                                p.name.toLowerCase().includes('dindin') || 
-                                p.name.toLowerCase().includes('dindim')
-                              );
+                              // Group products by category just like home screen
+                              const categories = ['Sabores', 'Sabores Especiais', 'Sabores Premium', 'Outros'];
                               
-                              if (flavorProducts.length === 0) return null;
+                              return categories.map(cat => {
+                                const catProducts = products.filter(p => {
+                                  if (cat === 'Sabores') return p.categoria === 'Sabores' || (!p.categoria && (p.name.toLowerCase().includes('dindin') || p.name.toLowerCase().includes('dindim')));
+                                  return p.categoria === cat;
+                                });
 
-                              const categoriesOrder = ['Sabores Especiais', 'Sabores Premium'];
-                              const grouped = flavorProducts.reduce((acc, p) => {
-                                const cat = categoriesOrder.includes(p.categoria as string) ? (p.categoria as string) : 'Outros Sabores';
-                                if (!acc[cat]) acc[cat] = [];
-                                acc[cat].push(p);
-                                return acc;
-                              }, {} as Record<string, Product[]>);
+                                if (catProducts.length === 0) return null;
 
-                              // Sort using the predefined order
-                              const sortedCats = Object.keys(grouped).sort((a, b) => {
-                                const order = [...categoriesOrder, 'Outros Sabores'];
-                                return order.indexOf(a) - order.indexOf(b);
+                                return (
+                                  <div key={cat} className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-px flex-grow bg-[#3E2723]/5" />
+                                      <span className="text-[10px] font-black uppercase tracking-widest text-[#3E2723]/30">{cat}</span>
+                                      <div className="h-px flex-grow bg-[#3E2723]/5" />
+                                    </div>
+                                    <div className="grid gap-4">
+                                      {catProducts.map(product => (
+                                        <ProductListItem 
+                                          key={product.id} 
+                                          product={product}
+                                          onUpdatePrice={onUpdatePrice}
+                                          onUpdateStock={onUpdateStock}
+                                          onUpdateField={onUpdateField}
+                                          toggleAvailability={toggleAvailability}
+                                          handleDeleteProduct={handleDeleteProduct}
+                                          isAdmin={isAdmin}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
                               });
-
-                              return sortedCats.map(cat => (
-                                <div key={cat} className="space-y-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-px flex-grow bg-[#E63956]/10" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#E63956]/30">{cat}</span>
-                                    <div className="h-px flex-grow bg-[#E63956]/10" />
-                                  </div>
-                                  <div className="grid gap-4">
-                                    {grouped[cat].map(product => (
-                                      <ProductListItem 
-                                        key={product.id} 
-                                        product={product} 
-                                        onUpdatePrice={onUpdatePrice}
-                                        onUpdateStock={onUpdateStock}
-                                        onUpdateField={onUpdateField}
-                                        toggleAvailability={toggleAvailability}
-                                        handleDeleteProduct={handleDeleteProduct}
-                                        isAdmin={isAdmin}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              ));
                             })()}
                           </div>
                         </section>
                       )}
 
-                      {activeTab === 'outros' && (
-                        <section className="space-y-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-[#3E2723]">
-                              <div className="p-2 bg-[#0EA5E9]/10 rounded-xl">
-                                <PieChart size={18} className="text-[#0EA5E9]" />
-                              </div>
-                              <div>
-                                <h3 className="font-black uppercase text-sm tracking-widest">Outras Delícias</h3>
-                                <p className="text-[10px] text-[#3E2723]/40 font-bold uppercase tracking-tighter">Bolos, Sorvetes e Sobremesas</p>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setIsAdding(true);
-                                setNewProduct(prev => ({ ...prev, categoria: 'Outros' }));
-                              }}
-                              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#0EA5E9] bg-[#0EA5E9]/5 px-4 py-2 rounded-xl hover:bg-[#0EA5E9]/10 transition-colors"
-                            >
-                              <Plus size={16} />
-                              Novo Produto
-                            </button>
-                          </div>
 
-                          <AnimatePresence>
-                            {isAdding && newProduct.categoria === 'Outros' && (
-                              <motion.form
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                onSubmit={handleAddProduct}
-                                className="bg-[#0EA5E9]/5 p-6 rounded-[32px] border border-[#0EA5E9]/20 space-y-4 overflow-hidden mb-6"
-                              >
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#0EA5E9]/40">Nome do Produto</label>
-                                    <input
-                                      type="text"
-                                      required
-                                      value={newProduct.name}
-                                      onChange={e => setNewProduct({...newProduct, name: e.target.value})}
-                                      className="w-full bg-white border border-[#0EA5E9]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                                      placeholder="Ex: Bolo de Pote"
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#0EA5E9]/40">Preço (R$)</label>
-                                    <input
-                                      type="number"
-                                      step="0.5"
-                                      required
-                                      value={newProduct.price}
-                                      onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
-                                      className="w-full bg-white border border-[#0EA5E9]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-black uppercase text-[#0EA5E9]/40">Foto do Produto</label>
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-2xl bg-white border border-[#0EA5E9]/10 flex items-center justify-center overflow-hidden shrink-0">
-                                      {newProduct.image ? (
-                                        <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover" />
-                                      ) : isUploading ? (
-                                        <Loader2 size={24} className="text-[#0EA5E9] animate-spin" />
-                                      ) : (
-                                        <ImageIcon size={24} className="text-[#0EA5E9]/20" />
-                                      )}
-                                    </div>
-                                    <div className="flex-grow">
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        disabled={isUploading}
-                                        onChange={e => {
-                                          const file = e.target.files?.[0];
-                                          if (file) handleImageUpload(file, (url, path) => setNewProduct({...newProduct, image: url, imagePath: path}));
-                                        }}
-                                        className="hidden"
-                                        id="new-other-product-image"
-                                      />
-                                      <label 
-                                        htmlFor="new-other-product-image"
-                                        className="flex items-center justify-center gap-2 w-full bg-white border border-[#0EA5E9]/10 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-wider text-[#0EA5E9] cursor-pointer hover:bg-[#0EA5E9]/5 transition-colors"
-                                      >
-                                        <ImageIcon size={14} />
-                                        Selecionar Foto
-                                      </label>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#0EA5E9]/40">Categoria</label>
-                                    <input 
-                                      type="text" 
-                                      readOnly 
-                                      value="Outros" 
-                                      className="w-full bg-white border border-[#0EA5E9]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold opacity-60"
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-[#0EA5E9]/40">Estoque Inicial</label>
-                                    <input
-                                      type="number"
-                                      value={newProduct.stock}
-                                      onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value) || 0})}
-                                      className="w-full bg-white border border-[#0EA5E9]/10 rounded-xl px-3 py-2 text-sm outline-none font-bold"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="flex gap-2 pt-2">
-                                  <button type="button" onClick={() => setIsAdding(false)} className="flex-1 bg-white text-[#0EA5E9] py-3 rounded-2xl font-black text-xs uppercase border border-[#0EA5E9]/10">Cancelar</button>
-                                  <button type="submit" disabled={isLoading} className="flex-1 bg-[#0EA5E9] text-white py-3 rounded-2xl font-black text-xs uppercase shadow-lg shadow-[#0EA5E9]/20 flex items-center justify-center gap-2">
-                                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Confirmar Produto'}
-                                  </button>
-                                </div>
-                              </motion.form>
-                            )}
-                          </AnimatePresence>
-
-                          {/* Other Products List */}
-                          <div className="grid gap-4">
-                            {products.filter(p => {
-                              const isFlavor = p.categoria?.startsWith('Sabores') || p.name.toLowerCase().includes('dindin') || p.name.toLowerCase().includes('dindim');
-                              return !isFlavor;
-                            }).map(product => (
-                              <ProductListItem 
-                                key={product.id} 
-                                product={product} 
-                                onUpdatePrice={onUpdatePrice}
-                                onUpdateStock={onUpdateStock}
-                                onUpdateField={onUpdateField}
-                                toggleAvailability={toggleAvailability}
-                                handleDeleteProduct={handleDeleteProduct}
-                                isAdmin={isAdmin}
-                              />
-                            ))}
-                          </div>
-                        </section>
-                      )}
 
                       {activeTab === 'fidelidade' && (
                         <section className="space-y-6">
