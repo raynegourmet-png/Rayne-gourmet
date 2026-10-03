@@ -23,6 +23,8 @@ export default function Cart({ isOpen, onClose, items, onUpdateQuantity, onClear
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
   const [address, setAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'cash'>('pix');
+  const [needsChange, setNeedsChange] = useState(false);
+  const [changeAmount, setChangeAmount] = useState('');
   const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
@@ -105,6 +107,11 @@ export default function Cart({ isOpen, onClose, items, onUpdateQuantity, onClear
       }
     }
 
+    if (paymentMethod === 'cash' && needsChange && (!changeAmount || parseFloat(changeAmount) <= total)) {
+      setValidationError(`Por favor, informe um valor de troco válido (maior que R$ ${total.toFixed(2)}).`);
+      return;
+    }
+
     const itemsList = items
       .map(item => `• ${item.quantity}x ${item.name} (R$ ${(item.price * item.quantity).toFixed(2)})`)
       .join('\n');
@@ -115,7 +122,7 @@ export default function Cart({ isOpen, onClose, items, onUpdateQuantity, onClear
 *Cliente:* ${customerName}
 *Tipo:* ${deliveryType === 'delivery' ? 'Entrega' : 'Retirada'}
 ${deliveryType === 'delivery' ? `*Bairro:* ${selectedArea?.name}\n*Endereço:* ${address}` : ''}
-*Pagamento:* ${paymentMethod.toUpperCase()}
+*Pagamento:* ${paymentMethod.toUpperCase()}${paymentMethod === 'cash' && needsChange ? ` (Troco para R$ ${parseFloat(changeAmount).toFixed(2).replace('.', ',')})` : ''}
 
 *Itens:*
 ${itemsList}
@@ -127,27 +134,20 @@ ${appliedCoupon ? `*Cupom (${appliedCoupon.code}):* -R$ ${discount.toFixed(2).re
 `.trim();
 
     try {
-      // Validate payment method is selected (though it has a default)
-      if (!paymentMethod) {
-        setValidationError('Por favor, selecione uma forma de pagamento.');
-        return;
-      }
-
-      // Save order to Firestore
+      // Save order to Firestore OBRIGATORIAMENTE before redirect
       const orderData: Omit<Order, 'id'> = {
         userId: user?.uid,
         customerName: customerName.trim(),
         address: deliveryType === 'delivery' ? `${selectedArea?.name} - ${address.trim()}` : 'Retirada na Loja',
-        items: items.map(item => ({
-          ...item,
-          // Clean item data for firestore storage if needed
-        })),
+        items: items.map(item => ({ ...item })),
         total: parseFloat(total.toFixed(2)),
         deliveryType: deliveryType,
         deliveryFee: deliveryFee,
         paymentMethod: paymentMethod,
         timestamp: Date.now(),
-        status: 'new' as OrderStatus
+        status: 'new' as OrderStatus,
+        needsChange: paymentMethod === 'cash' ? needsChange : false,
+        changeAmount: (paymentMethod === 'cash' && needsChange) ? parseFloat(changeAmount) : undefined
       };
 
       await saveOrder(orderData);
@@ -159,13 +159,7 @@ ${appliedCoupon ? `*Cupom (${appliedCoupon.code}):* -R$ ${discount.toFixed(2).re
       onClose();
     } catch (err) {
       console.error("Erro ao processar pedido:", err);
-      
-      // Still allow WhatsApp checkout even if DB save fails
-      const encodedMessage = encodeURIComponent(message);
-      window.open(`https://wa.me/5597984493292?text=${encodedMessage}`, '_blank');
-      
-      onClear();
-      onClose();
+      setValidationError("Houve um erro ao salvar seu pedido. Por favor, tente novamente.");
     }
   };
 
@@ -401,6 +395,53 @@ ${appliedCoupon ? `*Cupom (${appliedCoupon.code}):* -R$ ${discount.toFixed(2).re
                           <option value="cash">Dinheiro</option>
                         </select>
                       </div>
+
+                      <AnimatePresence>
+                        {paymentMethod === 'cash' && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="bg-white border border-[#3E2723]/10 rounded-2xl p-4 space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[#3E2723]/60 uppercase">Precisa de troco?</span>
+                              <button
+                                onClick={() => setNeedsChange(!needsChange)}
+                                className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${needsChange ? 'bg-[#E63956]' : 'bg-[#3E2723]/10'}`}
+                              >
+                                <motion.div
+                                  layout
+                                  className={`w-4 h-4 rounded-full bg-white shadow-sm ${needsChange ? 'ml-auto' : ''}`}
+                                />
+                              </button>
+                            </div>
+
+                            <AnimatePresence>
+                              {needsChange && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  className="space-y-2"
+                                >
+                                  <label className="block text-[10px] font-black uppercase text-[#3E2723]/40">Troco para quanto?</label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#3E2723]/40">R$</span>
+                                    <input
+                                      type="number"
+                                      value={changeAmount}
+                                      onChange={(e) => setChangeAmount(e.target.value)}
+                                      placeholder="Ex: 50,00"
+                                      className="w-full bg-[#F9F9F6] border border-[#3E2723]/5 rounded-xl pl-9 pr-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#E63956]/20"
+                                    />
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </>

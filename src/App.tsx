@@ -35,6 +35,7 @@ export default function App() {
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [userPoints, setUserPoints] = useState(0);
   const [activeCategory, setActiveCategory] = useState<'Tudo' | 'Sabores' | 'Outros'>('Tudo');
   const [storeConfig, setStoreConfig] = useState<StoreConfig>(() => {
     const saved = localStorage.getItem('rayne_config');
@@ -134,16 +135,22 @@ export default function App() {
     handleRedirect();
 
     let unsubscribeUserOrders: (() => void) | null = null;
+    let unsubscribeUserPoints: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       
-      if (unsubscribeUserOrders) {
-        unsubscribeUserOrders();
-        unsubscribeUserOrders = null;
-      }
+      if (unsubscribeUserOrders) unsubscribeUserOrders();
+      if (unsubscribeUserPoints) unsubscribeUserPoints();
 
       if (currentUser) {
+        // Listen to points
+        const pointsRef = ref(db, `users/${currentUser.uid}/points`);
+        unsubscribeUserPoints = onValue(pointsRef, (snapshot) => {
+          setUserPoints(snapshot.val() || 0);
+        });
+
+        // Listen to finished orders for ordersCount
         const ordersRef = ref(db, 'orders');
         const qUserOrders = query(
           ordersRef, 
@@ -162,6 +169,7 @@ export default function App() {
         });
       } else {
         setUserOrders([]);
+        setUserPoints(0);
       }
     });
 
@@ -187,7 +195,7 @@ export default function App() {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const tiersArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as LoyaltyTier))
-          .sort((a, b) => a.minOrders - b.minOrders);
+          .sort((a, b) => a.minPoints - b.minPoints);
         setLoyaltyTiers(tiersArray);
       }
     }, (error) => {
@@ -332,7 +340,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F9F6] text-[#3E2723] selection:bg-[#E63956]/20">
+    <div className="min-h-screen bg-[#F9F9F6] text-[#3E2723] selection:bg-[#E63956]/20 flex flex-col overflow-x-hidden">
       <Header 
         onMenuClick={() => setIsCartOpen(true)} 
         onLoginClick={handleLogin}
@@ -343,11 +351,11 @@ export default function App() {
         isStoreOpen={storeConfig.isOpen !== false}
         isLoggingIn={isLoggingIn}
         user={user}
-        points={userOrders.length}
+        points={userPoints}
         loyaltyTiers={loyaltyTiers}
       />
 
-      <main className="max-w-7xl mx-auto px-6 py-12 md:py-20">
+      <main className="flex-grow max-w-7xl mx-auto px-6 py-12 md:py-20 w-full">
         {storeConfig.isOpen === false && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
@@ -408,7 +416,7 @@ export default function App() {
 
         <ClubRayne 
           tiers={loyaltyTiers} 
-          userOrdersCount={userOrders.length}
+          userPoints={userPoints}
           isLoggedIn={!!user}
           onJoin={handleLogin}
           isLoggingIn={isLoggingIn}

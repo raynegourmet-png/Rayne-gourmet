@@ -30,43 +30,43 @@ export default function Header({
   points,
   loyaltyTiers
 }: HeaderProps) {
-  const currentTier = [...loyaltyTiers].reverse().find(t => points >= t.minOrders) || loyaltyTiers[0];
-  const nextTier = loyaltyTiers.find(t => t.minOrders > points);
+  const currentTier = [...loyaltyTiers].reverse().find(t => points >= t.minPoints) || loyaltyTiers[0];
+  const nextTier = loyaltyTiers.find(t => t.minPoints > points);
   const progress = nextTier 
-    ? ((points - (currentTier?.minOrders || 0)) / (nextTier.minOrders - (currentTier?.minOrders || 0))) * 100 
+    ? ((points - (currentTier?.minPoints || 0)) / (nextTier.minPoints - (currentTier?.minPoints || 0))) * 100 
     : 100;
 
   return (
     <header className="relative w-full bg-[#FFFDE7] overflow-hidden">
-      <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2">
+      <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto gap-4">
+        <div className="flex items-center gap-2 min-w-0">
           <img 
             src="/assets/images/rayne_gourmet_logo_1789856632119.jpg" 
             alt="Rayne Gourmet Logo" 
             loading="lazy"
-            className="w-10 h-10 md:w-12 md:h-12 rounded-full shadow-sm object-cover"
+            className="w-10 h-10 md:w-12 md:h-12 rounded-full shadow-sm object-cover shrink-0"
             referrerPolicy="no-referrer"
           />
-          <div className="flex flex-col">
-            <span className="text-[#3E2723] font-bold text-lg md:text-xl tracking-tight leading-none">Rayne Gourmet</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[#3E2723] font-bold text-lg md:text-xl tracking-tight leading-none truncate">Rayne Gourmet</span>
             <div className="flex items-center gap-1 mt-1">
-              <div className={`w-2 h-2 rounded-full ${isStoreOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-              <span className={`text-[10px] font-black uppercase tracking-tighter ${isStoreOpen ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isStoreOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+              <span className={`text-[10px] font-black uppercase tracking-tighter truncate ${isStoreOpen ? 'text-green-600' : 'text-red-600'}`}>
                 {isStoreOpen ? 'Aberta' : 'Fechada'}
               </span>
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-1 md:gap-4">
+        <div className="flex items-center gap-1 md:gap-4 shrink-0">
           {isAdmin && (
             <button 
               onClick={onAdminClick}
-              aria-label="Abrir painel de controle"
-              className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-white font-bold text-xs md:text-sm bg-[#E63956] rounded-full hover:bg-[#D81B60] transition-all shadow-md shadow-[#E63956]/20"
+              aria-label="Painel de Gestão"
+              className="flex items-center justify-center w-9 h-9 sm:w-auto sm:px-4 sm:py-2 text-white bg-[#E63956] rounded-full hover:bg-[#D81B60] transition-all shadow-md shadow-[#E63956]/20 shrink-0"
             >
-              <Settings size={16} />
-              <span className="hidden sm:inline">Painel de Controle</span>
+              <Settings size={18} />
+              <span className="hidden sm:inline ml-2 font-bold text-sm text-nowrap">Painel de Controle</span>
             </button>
           )}
 
@@ -94,12 +94,12 @@ export default function Header({
                     </div>
                   </div>
                   
-                  <div className="flex flex-col pr-2">
-                    <span className="text-[11px] font-black text-[#3E2723] leading-none uppercase truncate max-w-[100px]">
+                  <div className="flex flex-col pr-1 md:pr-2">
+                    <span className="text-[10px] md:text-[11px] font-black text-[#3E2723] leading-none uppercase truncate max-w-[70px] md:max-w-[100px]">
                       {user.displayName || 'Cliente'}
                     </span>
                     
-                    <div className="mt-1.5 w-24 h-1.5 bg-[#F9F9F6] rounded-full overflow-hidden border border-[#3E2723]/5">
+                    <div className="mt-1 w-16 md:w-24 h-1 md:h-1.5 bg-[#F9F9F6] rounded-full overflow-hidden border border-[#3E2723]/5">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
@@ -109,8 +109,8 @@ export default function Header({
                     </div>
                     
                     <div className="flex justify-between items-center mt-1">
-                      <span className="text-[8px] font-black uppercase opacity-40 tracking-tighter" style={{ color: currentTier?.color }}>{currentTier?.name}</span>
-                      <span className="text-[8px] font-black text-[#E63956]">{points} un</span>
+                      <span className="text-[7px] md:text-[8px] font-black uppercase opacity-40 tracking-tighter" style={{ color: currentTier?.color }}>{currentTier?.name}</span>
+                      <span className="text-[7px] md:text-[8px] font-black text-[#E63956]">{points} pt</span>
                     </div>
                   </div>
                 </button>

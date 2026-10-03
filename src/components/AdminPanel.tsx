@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Lock, X, Save, Power, Edit3, Trash2, History, Crown, Plus, LogOut, Mail, Loader2, Package, ImageIcon, Rocket, Check, Share2, Sparkles, BarChart3, PieChart, Ticket, Truck, MapPin, Clock, CreditCard, User as UserIcon, MessageSquare, Star, Users } from 'lucide-react';
 import { Product, Order, LoyaltyTier, Coupon, DeliveryArea, StoreConfig, OrderStatus, Category, Feedback } from '../types';
-import { addProduct, updateProduct, deleteProduct, updateLoyaltyTier, getOrders, getCoupons, addCoupon, updateCoupon, deleteCoupon, getDeliveryAreas, addDeliveryArea, updateDeliveryArea, deleteDeliveryArea, getStoreConfig, updateStoreConfig, updateOrder, deleteOrder, getFeedbacks, uploadImage, deleteImage, handleFirestoreError, handleDatabaseError, OperationType } from '../lib/db';
+import { addProduct, updateProduct, deleteProduct, updateLoyaltyTier, getOrders, getCoupons, addCoupon, updateCoupon, deleteCoupon, getDeliveryAreas, addDeliveryArea, updateDeliveryArea, deleteDeliveryArea, getStoreConfig, updateStoreConfig, updateOrder, deleteOrder, getFeedbacks, uploadImage, deleteImage, handleFirestoreError, handleDatabaseError, OperationType, updateUserPoints } from '../lib/db';
 import { INITIAL_CONFIG } from '../data';
 import { auth, googleProvider, db } from '../lib/firebase';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, User, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
@@ -403,6 +403,16 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
     
     try {
       await updateOrder(id, { status });
+      
+      // Credit points if order is finished and has a userId
+      if (status === 'finished') {
+        const order = orders.find(o => o.id === id);
+        if (order && order.userId) {
+          // 1 point per R$ 1.00 spent
+          const pointsToCredit = Math.floor(order.total);
+          await updateUserPoints(order.userId, pointsToCredit);
+        }
+      }
     } catch (err: any) {
       console.error("Error updating order status:", err);
       alert(`Erro ao atualizar status: ${err.message}`);
@@ -515,7 +525,27 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                     <Settings size={20} className="text-[#E63956]" />
                     <h2 className="text-sm font-black uppercase tracking-tighter">Painel de Gestão</h2>
                   </div>
-                  <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full"><X size={24} /></button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        const currentStatus = storeConfig.isOpen !== false;
+                        const newStatus = !currentStatus;
+                        setStoreConfig({...storeConfig, isOpen: newStatus});
+                        try {
+                          await updateStoreConfig({ isOpen: newStatus });
+                        } catch (err) {
+                          alert("Erro ao atualizar status da loja.");
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all active:scale-95 ${storeConfig.isOpen !== false ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}
+                    >
+                      <div className={`w-1.5 h-1.5 rounded-full ${storeConfig.isOpen !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                      <span className="text-[9px] font-black uppercase tracking-tighter">
+                        {storeConfig.isOpen !== false ? 'Aberta' : 'Fechada'}
+                      </span>
+                    </button>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full"><X size={24} /></button>
+                  </div>
                 </div>
 
                 {/* Mobile Tab Nav */}
@@ -523,7 +553,7 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                   {[
                     { id: 'resumo', label: 'Resumo' },
                     { id: 'pedidos', label: 'Pedidos' },
-                    { id: 'sabores', label: 'Sabores' },
+                    { id: 'produtos', label: 'Produtos' },
                     { id: 'config', label: 'Loja' },
                     { id: 'clientes', label: 'Clientes' },
                   ].map(tab => (
@@ -1033,13 +1063,13 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                                     <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: tier.color }}>{tier.name}</h4>
                                   </div>
                                   <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-[#3E2723]/5 shadow-sm">
-                                    <span className="text-[8px] font-black text-[#3E2723]/40 uppercase tracking-tighter">Pedidos Min.</span>
-                                    <input
-                                      type="number"
-                                      value={tier.minOrders}
-                                      onChange={(e) => updateLoyaltyTier(tier.id, { minOrders: parseInt(e.target.value) || 0 })}
-                                      className="w-8 text-[10px] font-black bg-transparent outline-none text-center"
-                                    />
+                                  <span className="text-[8px] font-black text-[#3E2723]/40 uppercase tracking-tighter">Pontos Min.</span>
+                                  <input
+                                    type="number"
+                                    value={tier.minPoints}
+                                    onChange={(e) => updateLoyaltyTier(tier.id, { minPoints: parseInt(e.target.value) || 0 })}
+                                    className="w-8 text-[10px] font-black bg-transparent outline-none text-center"
+                                  />
                                   </div>
                                 </div>
                                 <div className="space-y-2">
@@ -1386,9 +1416,15 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const currentStatus = storeConfig.isOpen !== false;
-                                    setStoreConfig({...storeConfig, isOpen: !currentStatus});
+                                    const newStatus = !currentStatus;
+                                    setStoreConfig({...storeConfig, isOpen: newStatus});
+                                    try {
+                                      await updateStoreConfig({ isOpen: newStatus });
+                                    } catch (err) {
+                                      alert("Erro ao atualizar status da loja.");
+                                    }
                                   }}
                                   className={`w-14 h-8 rounded-full p-1.5 transition-all flex items-center ${storeConfig.isOpen !== false ? 'bg-green-500' : 'bg-red-500'}`}
                                 >

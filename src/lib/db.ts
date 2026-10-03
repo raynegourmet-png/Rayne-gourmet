@@ -124,31 +124,45 @@ export const updateLoyaltyTier = async (id: string, data: Partial<LoyaltyTier>) 
 
 // Orders
 export const saveOrder = async (order: Omit<Order, 'id'>): Promise<string> => {
-  const ordersRef = ref(db, 'orders');
-  const newOrderRef = push(ordersRef);
-  const orderId = newOrderRef.key!;
-  
-  const updates: any = {};
-  updates[`orders/${orderId}`] = {
-    ...order,
-    status: order.status || 'new',
-    timestamp: Date.now()
-  };
+  try {
+    const ordersRef = ref(db, 'orders');
+    const newOrderRef = push(ordersRef);
+    const orderId = newOrderRef.key!;
+    
+    const orderToSave = {
+      ...order,
+      id: orderId,
+      status: order.status || 'new',
+      timestamp: Date.now()
+    };
 
-  // Stock management in transaction or individual updates
-  // For simplicity here we use individual updates, but transaction is safer for stock
-  await update(ref(db), updates);
+    await set(ref(db, `orders/${orderId}`), orderToSave);
 
-  // Update stock
-  for (const item of order.items) {
-    const productStockRef = ref(db, `products/${item.id}/stock`);
-    await runTransaction(productStockRef, (currentStock) => {
-      if (currentStock === null) return 0;
-      return currentStock - item.quantity;
-    });
+    // Update stock
+    for (const item of order.items) {
+      try {
+        const productStockRef = ref(db, `products/${item.id}/stock`);
+        await runTransaction(productStockRef, (currentStock) => {
+          if (currentStock === null) return 0;
+          return Math.max(0, currentStock - item.quantity);
+        });
+      } catch (stockErr) {
+        console.warn(`Could not update stock for product ${item.id}:`, stockErr);
+      }
+    }
+
+    return orderId;
+  } catch (err) {
+    handleDatabaseError(err, OperationType.CREATE, 'orders');
+    return '';
   }
+};
 
-  return orderId;
+export const updateUserPoints = async (userId: string, pointsToAdd: number) => {
+  const userPointsRef = ref(db, `users/${userId}/points`);
+  await runTransaction(userPointsRef, (currentPoints) => {
+    return (currentPoints || 0) + pointsToAdd;
+  });
 };
 
 export const updateOrder = async (id: string, data: Partial<Order>) => {

@@ -4,13 +4,13 @@ import { LoyaltyTier } from '../types';
 
 interface ClubRayneProps {
   tiers: LoyaltyTier[];
-  userOrdersCount: number;
+  userPoints: number;
   isLoggedIn: boolean;
   onJoin?: () => void;
   isLoggingIn?: boolean;
 }
 
-export default function ClubRayne({ tiers, userOrdersCount, isLoggedIn, onJoin, isLoggingIn }: ClubRayneProps) {
+export default function ClubRayne({ tiers, userPoints, isLoggedIn, onJoin, isLoggingIn }: ClubRayneProps) {
   const getIcon = (id: string) => {
     switch (id) {
       case 'bronze': return <Medal size={32} />;
@@ -21,10 +21,10 @@ export default function ClubRayne({ tiers, userOrdersCount, isLoggedIn, onJoin, 
     }
   };
 
-  const currentTier = [...tiers].reverse().find(t => userOrdersCount >= t.minOrders) || tiers[0];
-  const nextTier = tiers.find(t => t.minOrders > userOrdersCount);
+  const currentTier = [...tiers].reverse().find(t => userPoints >= t.minPoints) || tiers[0];
+  const nextTier = tiers.find(t => t.minPoints > userPoints);
   const progress = nextTier 
-    ? ((userOrdersCount - (currentTier?.minOrders || 0)) / (nextTier.minOrders - (currentTier?.minOrders || 0))) * 100 
+    ? ((userPoints - (currentTier?.minPoints || 0)) / (nextTier.minPoints - (currentTier?.minPoints || 0))) * 100 
     : 100;
 
   return (
@@ -86,8 +86,8 @@ export default function ClubRayne({ tiers, userOrdersCount, isLoggedIn, onJoin, 
                 <h4 className="text-xl font-black text-[#3E2723]" style={{ color: currentTier?.color }}>{currentTier?.name}</h4>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-black text-[#3E2723]">{userOrdersCount}</p>
-                <p className="text-[10px] font-black uppercase text-[#3E2723]/40">Pedidos</p>
+                <p className="text-2xl font-black text-[#3E2723]">{userPoints}</p>
+                <p className="text-[10px] font-black uppercase text-[#3E2723]/40">Pontos</p>
               </div>
             </div>
             
@@ -102,7 +102,7 @@ export default function ClubRayne({ tiers, userOrdersCount, isLoggedIn, onJoin, 
             
             {nextTier && (
               <p className="mt-3 text-[10px] font-bold text-[#3E2723]/40 uppercase tracking-tighter">
-                Faltam {nextTier.minOrders - userOrdersCount} pedidos para o nível <span style={{ color: nextTier.color }}>{nextTier.name}</span>
+                Faltam {nextTier.minPoints - userPoints} pontos para o nível <span style={{ color: nextTier.color }}>{nextTier.name}</span>
               </p>
             )}
           </motion.div>
@@ -135,7 +135,7 @@ export default function ClubRayne({ tiers, userOrdersCount, isLoggedIn, onJoin, 
 
             <h3 className="text-2xl font-bold text-[#3E2723] mb-1">{tier.name}</h3>
             <p className="text-xs font-bold uppercase tracking-widest text-[#3E2723]/40 mb-6">
-              A partir de {tier.minOrders} pedidos
+              A partir de {tier.minPoints} pontos
             </p>
 
             <ul className="space-y-3 flex-grow">

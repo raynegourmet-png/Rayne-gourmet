@@ -22,7 +22,7 @@ export interface LoyaltyTier {
   id: 'bronze' | 'prata' | 'ouro' | 'diamante';
   name: string;
   benefits: string[];
-  minOrders: number;
+  minPoints: number;
   color: string;
 }
 
@@ -40,6 +40,8 @@ export interface Order {
   paymentMethod: 'pix' | 'card' | 'cash';
   timestamp: number;
   status: OrderStatus;
+  needsChange?: boolean;
+  changeAmount?: number;
 }
 
 export interface Feedback {

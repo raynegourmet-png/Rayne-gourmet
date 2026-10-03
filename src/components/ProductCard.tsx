@@ -37,32 +37,45 @@ export default function ProductCard({ product, quantity, onAdd, onRemove }: Prod
       className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col h-full group"
     >
       <div className="relative aspect-square overflow-hidden bg-slate-100">
-        <AnimatePresence mode="wait">
-          <motion.img
+        <div className="relative w-full h-full">
+          <motion.div
             key={currentImageIndex}
-            src={allImages[currentImageIndex]}
-            alt={product.name}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            loading="lazy"
-            className={`w-full h-full object-cover ${!isAvailable ? 'grayscale opacity-50' : ''}`}
-            referrerPolicy="no-referrer"
-          />
-        </AnimatePresence>
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.x > 50) prevImage(new MouseEvent('click') as any);
+              else if (info.offset.x < -50) nextImage(new MouseEvent('click') as any);
+            }}
+            className="w-full h-full cursor-grab active:cursor-grabbing"
+          >
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={currentImageIndex}
+                src={allImages[currentImageIndex]}
+                alt={product.name}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                loading="lazy"
+                className={`w-full h-full object-cover pointer-events-none ${!isAvailable ? 'grayscale opacity-50' : ''}`}
+                referrerPolicy="no-referrer"
+              />
+            </AnimatePresence>
+          </motion.div>
+        </div>
 
         {allImages.length > 1 && (
           <>
             <button
               onClick={prevImage}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-[#3E2723] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-[#3E2723] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-sm z-10"
             >
               <ChevronLeft size={20} />
             </button>
             <button
               onClick={nextImage}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-[#3E2723] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-[#3E2723] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-sm z-10"
             >
               <ChevronRight size={20} />
             </button>
