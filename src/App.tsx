@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, LogIn, Crown, History, Settings, LogOut, Sparkles, Star, Loader2, Clock } from 'lucide-react';
 import { auth, googleProvider, db } from './lib/firebase';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { ref, onValue, query, orderByChild, equalTo, get } from 'firebase/database';
+import { collection, onSnapshot, query, where, orderBy, getDoc, doc } from 'firebase/firestore';
 import { initializeDataIfEmpty, handleDatabaseError, OperationType } from './lib/db';
 
 export default function App() {
@@ -76,19 +76,19 @@ export default function App() {
         return;
       }
 
-      // 2. Check /admins/${uid} node
+      // 2. Check /users/${uid} document for isAdmin flag
       try {
-        const adminRef = ref(db, `admins/${user.uid}`);
-        const adminSnapshot = await get(adminRef);
-        if (adminSnapshot.exists() && adminSnapshot.val() === true) {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnapshot = await getDoc(userRef);
+        if (userSnapshot.exists() && userSnapshot.data().isAdmin === true) {
           setIsAdmin(true);
           return;
         }
 
-        // 3. Check /users/${uid}/isAdmin node
-        const userAdminRef = ref(db, `users/${user.uid}/isAdmin`);
-        const userAdminSnapshot = await get(userAdminRef);
-        if (userAdminSnapshot.exists() && userAdminSnapshot.val() === true) {
+        // 3. Check /admins collection
+        const adminRef = doc(db, 'admins', user.uid);
+        const adminSnapshot = await getDoc(adminRef);
+        if (adminSnapshot.exists()) {
           setIsAdmin(true);
           return;
         }
@@ -145,27 +145,29 @@ export default function App() {
 
       if (currentUser) {
         // Listen to points
-        const pointsRef = ref(db, `users/${currentUser.uid}/points`);
-        unsubscribeUserPoints = onValue(pointsRef, (snapshot) => {
-          setUserPoints(snapshot.val() || 0);
+        const userRef = doc(db, 'users', currentUser.uid);
+        unsubscribeUserPoints = onSnapshot(userRef, (snapshot) => {
+          if (snapshot.exists()) {
+            setUserPoints(snapshot.data().points || 0);
+          } else {
+            setUserPoints(0);
+          }
+        }, (err) => {
+          console.warn("User points snapshot failed:", err);
         });
 
         // Listen to finished orders for ordersCount
-        const ordersRef = ref(db, 'orders');
+        const ordersCol = collection(db, 'orders');
         const qUserOrders = query(
-          ordersRef, 
-          orderByChild('userId'),
-          equalTo(currentUser.uid)
+          ordersCol, 
+          where('userId', '==', currentUser.uid),
+          orderBy('timestamp', 'desc')
         );
-        unsubscribeUserOrders = onValue(qUserOrders, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            const ordersArray = Object.keys(data).map(key => ({ id: key, ...data[key] }))
-              .sort((a, b) => b.timestamp - a.timestamp);
-            setUserOrders(ordersArray);
-          } else {
-            setUserOrders([]);
-          }
+        unsubscribeUserOrders = onSnapshot(qUserOrders, (snapshot) => {
+          const ordersArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setUserOrders(ordersArray);
+        }, (err) => {
+          console.warn("User orders snapshot failed:", err);
         });
       } else {
         setUserOrders([]);
@@ -174,15 +176,12 @@ export default function App() {
     });
 
     // Listen to products
-    const productsRef = ref(db, 'products');
-    const unsubscribeProducts = onValue(productsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const productsArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as Product))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setProducts(productsArray);
-        localStorage.setItem('rayne_products', JSON.stringify(productsArray));
-      }
+    const prodCol = collection(db, 'products');
+    const unsubscribeProducts = onSnapshot(prodCol, (snapshot) => {
+      const productsArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setProducts(productsArray);
+      localStorage.setItem('rayne_products', JSON.stringify(productsArray));
       setIsLoading(false);
     }, (error) => {
       handleDatabaseError(error, OperationType.LIST, 'products');
@@ -190,52 +189,42 @@ export default function App() {
     });
 
     // Listen to tiers
-    const tiersRef = ref(db, 'loyaltyTiers');
-    const unsubscribeTiers = onValue(tiersRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const tiersArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as LoyaltyTier))
-          .sort((a, b) => a.minPoints - b.minPoints);
-        setLoyaltyTiers(tiersArray);
-      }
+    const tiersCol = collection(db, 'loyaltyTiers');
+    const unsubscribeTiers = onSnapshot(tiersCol, (snapshot) => {
+      const tiersArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoyaltyTier))
+        .sort((a, b) => a.minPoints - b.minPoints);
+      setLoyaltyTiers(tiersArray);
     }, (error) => {
       handleDatabaseError(error, OperationType.LIST, 'loyaltyTiers');
     });
 
     // Listen to coupons
-    const couponsRef = ref(db, 'coupons');
-    const unsubscribeCoupons = onValue(couponsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const couponsArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as Coupon));
-        setCoupons(couponsArray);
-      }
+    const couponsCol = collection(db, 'coupons');
+    const unsubscribeCoupons = onSnapshot(couponsCol, (snapshot) => {
+      const couponsArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
+      setCoupons(couponsArray);
     }, (error) => {
       handleDatabaseError(error, OperationType.LIST, 'coupons');
     });
 
     // Listen to delivery areas
-    const areasRef = ref(db, 'deliveryAreas');
-    const unsubscribeAreas = onValue(areasRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const areasArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as DeliveryArea))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setDeliveryAreas(areasArray);
-      }
+    const areasCol = collection(db, 'deliveryAreas');
+    const unsubscribeAreas = onSnapshot(areasCol, (snapshot) => {
+      const areasArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DeliveryArea))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setDeliveryAreas(areasArray);
     }, (error) => {
       handleDatabaseError(error, OperationType.LIST, 'deliveryAreas');
     });
 
     // Listen to store config
-    const configRef = ref(db, 'config/settings');
-    const unsubscribeConfig = onValue(configRef, (snapshot) => {
+    const configDoc = doc(db, 'config', 'settings');
+    const unsubscribeConfig = onSnapshot(configDoc, (snapshot) => {
       if (snapshot.exists()) {
-        const configData = { id: 'settings', ...snapshot.val() } as StoreConfig;
+        const configData = { id: 'settings', ...snapshot.data() } as StoreConfig;
         setStoreConfig(configData);
         localStorage.setItem('rayne_config', JSON.stringify(configData));
       } else {
-        // Se não existe no banco, usamos o padrão inicial e tentamos persistir
         setStoreConfig({ id: 'settings', ...INITIAL_CONFIG } as StoreConfig);
       }
     }, (error) => {
@@ -250,6 +239,7 @@ export default function App() {
       unsubscribeConfig();
       unsubscribeAuth();
       if (unsubscribeUserOrders) unsubscribeUserOrders();
+      if (unsubscribeUserPoints) unsubscribeUserPoints();
     };
   }, []);
 

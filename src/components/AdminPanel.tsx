@@ -6,7 +6,7 @@ import { addProduct, updateProduct, deleteProduct, updateLoyaltyTier, getOrders,
 import { INITIAL_CONFIG } from '../data';
 import { auth, googleProvider, db } from '../lib/firebase';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, User, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
-import { ref, onValue, query, orderByChild, equalTo } from 'firebase/database';
+import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import FlyerGenerator from './FlyerGenerator';
 
 interface AdminPanelProps {
@@ -93,79 +93,49 @@ export default function AdminPanel({ isOpen, onClose, products, loyaltyTiers, us
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
-
-  useEffect(() => {
     let unsubscribeOrders: (() => void) | null = null;
     let unsubscribeCoupons: (() => void) | null = null;
     let unsubscribeAreas: (() => void) | null = null;
     let unsubscribeFeedbacks: (() => void) | null = null;
 
     if (isAdmin) {
-      // No internal config listener needed anymore as it's handled in App.tsx
-
       // Listen to all orders in real-time
-      const ordersRef = ref(db, 'orders');
-      unsubscribeOrders = onValue(ordersRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const ordersArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as Order))
-            .sort((a, b) => b.timestamp - a.timestamp);
-          setOrders(ordersArray);
-        } else {
-          setOrders([]);
-        }
+      const ordersCol = collection(db, 'orders');
+      const qOrders = query(ordersCol, orderBy('timestamp', 'desc'));
+      unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
+        const ordersArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        setOrders(ordersArray);
       }, (err) => {
-        handleDatabaseError(err, OperationType.LIST, 'orders');
+        console.error("Orders snapshot failed:", err);
       });
 
       // Listen to coupons in real-time
-      const couponsRef = ref(db, 'coupons');
-      unsubscribeCoupons = onValue(couponsRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const couponsArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as Coupon));
-          setCoupons(couponsArray);
-        } else {
-          setCoupons([]);
-        }
+      const couponsCol = collection(db, 'coupons');
+      unsubscribeCoupons = onSnapshot(couponsCol, (snapshot) => {
+        const couponsArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
+        setCoupons(couponsArray);
       }, (err) => {
-        handleDatabaseError(err, OperationType.LIST, 'coupons');
+        console.error("Coupons snapshot failed:", err);
       });
 
       // Listen to delivery areas in real-time
-      const areasRef = ref(db, 'deliveryAreas');
-      unsubscribeAreas = onValue(areasRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const areasArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as DeliveryArea))
-            .sort((a, b) => a.name.localeCompare(b.name));
-          setDeliveryAreas(areasArray);
-        } else {
-          setDeliveryAreas([]);
-        }
+      const areasCol = collection(db, 'deliveryAreas');
+      unsubscribeAreas = onSnapshot(areasCol, (snapshot) => {
+        const areasArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DeliveryArea))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setDeliveryAreas(areasArray);
       }, (err) => {
-        handleDatabaseError(err, OperationType.LIST, 'deliveryAreas');
+        console.error("Delivery areas snapshot failed:", err);
       });
 
       // Listen to feedbacks in real-time
-      const feedbacksRef = ref(db, 'feedbacks');
-      unsubscribeFeedbacks = onValue(feedbacksRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const feedbacksArray = Object.keys(data).map(key => ({ id: key, ...data[key] } as Feedback))
-            .sort((a, b) => b.timestamp - a.timestamp);
-          setFeedbacks(feedbacksArray);
-        } else {
-          setFeedbacks([]);
-        }
+      const feedbacksCol = collection(db, 'feedbacks');
+      const qFeedbacks = query(feedbacksCol, orderBy('timestamp', 'desc'));
+      unsubscribeFeedbacks = onSnapshot(qFeedbacks, (snapshot) => {
+        const feedbacksArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Feedback));
+        setFeedbacks(feedbacksArray);
       }, (err) => {
-        handleDatabaseError(err, OperationType.LIST, 'feedbacks');
+        console.error("Feedbacks snapshot failed:", err);
       });
     }
 
